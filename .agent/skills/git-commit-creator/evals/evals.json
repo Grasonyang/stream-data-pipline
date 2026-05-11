@@ -1,0 +1,23 @@
+{
+  "skill_name": "git-commit-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Generating a commit message for the first time setup of the project.",
+      "expected_output": "init: [description]",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Generating a commit message for a newly added user registration form.",
+      "expected_output": "feat: [description]",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Generating a commit message for a bug fix where the login button was broken.",
+      "expected_output": "fix: [description]",
+      "files": []
+    }
+  ]
+}

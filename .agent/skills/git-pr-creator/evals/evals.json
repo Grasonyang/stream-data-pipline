@@ -1,0 +1,17 @@
+{
+  "skill_name": "git-pr-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a GitHub Pull Request for my recent bug fix for the login crash on the 'fix/login-crash' branch relative to 'main'.",
+      "expected_output": "gh pr create --title \"fix: resolve login crash\" ...",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Generating a PR for the new 'feature/search-api' branch comparing it with 'develop'.",
+      "expected_output": "gh pr create --title \"feat: add search api support\" ...",
+      "files": []
+    }
+  ]
+}
