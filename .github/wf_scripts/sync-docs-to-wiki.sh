@@ -11,6 +11,12 @@ echo "### Syncing .docs/ content to wiki root..."
 # Clone wiki 倉庫
 git clone "$WIKI_URL" wiki
 
+# 從 _sidebar.yml 生成 _Sidebar.md
+if [ -f ".docs/_sidebar.yml" ]; then
+  echo "### Generating _Sidebar.md from _sidebar.yml..."
+  python3 .github/wf_scripts/generate_sidebar.py .docs/_sidebar.yml wiki/_Sidebar.md
+fi
+
 # 同步內容 (平鋪在跟目錄，排除 .git 目錄)
 rsync -av --delete .docs/ wiki/ --exclude .git
 

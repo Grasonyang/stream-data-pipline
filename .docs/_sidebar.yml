@@ -1,0 +1,23 @@
+sidebar:
+  - title: socket-data-analyzer-c
+    items:
+      - title: Full System Spec
+        page: full_spec
+      - title: C Entry Point
+        items:
+          - title: Pipeline Dispatcher
+            page: pipeline_dispatcher-v1.0
+      - title: BusyBox Applets
+        items:
+          - title: Stream Merge
+            page: stream_merge-v1.0
+          - title: Log Parse
+            page: log_parse-v1.0
+          - title: Clip Store
+            page: clip_store-v1.0
+      - title: Shared Libraries
+        items:
+          - title: Stream Logger
+            page: stream_logger-v1.0
+          - title: Libpipeline
+            page: libpipeline-v1.0
