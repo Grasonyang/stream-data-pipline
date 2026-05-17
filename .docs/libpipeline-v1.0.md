@@ -29,7 +29,10 @@
 #include <stdint.h>
 
 /**
- * 建立 inotify 監聽，監聽指定目錄的 IN_CLOSE_WRITE 事件
+ * 建立 inotify 監聽，監聽指定目錄的 IN_CREATE | IN_MOVED_TO 事件。
+ *
+ * v1 主要用途：監聽 sentinel `.pipeline_end` 的建立。目錄本身不會
+ * 包含 chunk 檔（v1 改為單一 growing blob），因此不再訂 IN_CLOSE_WRITE。
  *
  * @param dir_path           欲監聽的目錄絕對路徑（必須已存在）
  * @param watch_descriptor   out 參數，回傳 inotify_add_watch() 的 wd
@@ -41,6 +44,19 @@
  *   - 自行管理 inotify_event 的讀取與解析
  */
 int pipeline_watch_dir(const char *dir_path, int *watch_descriptor);
+
+/**
+ * 建立 inotify 監聽，監聽單一檔案的 IN_MODIFY 事件。
+ *
+ * v1 用途：stream_merge 監聽 Fastify 上層持續 append 的
+ * `{session_id}.bin`，收到事件後從上次 offset 繼續 tail-read。
+ *
+ * @param file_path          欲監聽的檔案絕對路徑（必須已存在）
+ * @param watch_descriptor   out 參數，回傳 inotify_add_watch() 的 wd
+ *
+ * @return inotify fd（>= 0），失敗時回傳 -1 並設定 errno
+ */
+int pipeline_watch_file(const char *file_path, int *watch_descriptor);
 
 /**
  * 回傳當前 monotonic 時間（毫秒）
@@ -93,7 +109,7 @@ inotify_init1(IN_NONBLOCK | IN_CLOEXEC)
     │
     ├── 失敗 → return -1（errno 由 inotify_init1 設定）
     │
-    └── inotify_add_watch(fd, dir_path, IN_CLOSE_WRITE | IN_MOVED_TO)
+    └── inotify_add_watch(fd, dir_path, IN_CREATE | IN_MOVED_TO)
             │
             ├── 失敗 → close(fd) + return -1
             └── 成功 → *watch_descriptor = wd; return fd
@@ -103,7 +119,20 @@ inotify_init1(IN_NONBLOCK | IN_CLOEXEC)
 |---|---|
 | `IN_NONBLOCK` | 與 `select`/`poll` 整合，避免 read 阻塞主迴圈 |
 | `IN_CLOEXEC` | `fork()` 後子進程不繼承 inotify fd |
-| `IN_CLOSE_WRITE \| IN_MOVED_TO` | 覆蓋兩種落地方式：write+close、rename-into-place |
+| `IN_CREATE \| IN_MOVED_TO` | 主要目的是偵測 sentinel 出現；覆蓋 `touch` 與 `rename-into-place` 兩種落地 |
+
+### 3.1b `pipeline_watch_file`
+
+```
+inotify_init1(IN_NONBLOCK | IN_CLOEXEC)
+    │
+    └── inotify_add_watch(fd, file_path, IN_MODIFY)
+            └── 成功 → *watch_descriptor = wd; return fd
+```
+
+依照 v1 架構，Fastify 上層會持續 append `{session_id}.bin`，每次 append 觸發 `IN_MODIFY`。`stream_merge` 在主迴圈中接收事件後以上次紀錄的 offset 繼續 `read()`。
+
+**重要**：`IN_MODIFY` 可能被 batch（kernel 合併多次 write），因此事件數不等於 write 次數；`stream_merge` 應該**以事件為觸發、以 EOF 為邊界**不斷讀取。
 
 ### 3.2 `pipeline_now_ms`
 
@@ -141,23 +170,42 @@ return strcmp(filename, ".pipeline_end") == 0;
 
 ## 四、Sentinel 檔案機制（與 Fastify 上層的契約）
 
+sentinel **不是**「下層開始工作」的觸發點（dispatcher 在 `STRT` 階段已經啟動、`stream_merge` 已持續 tail-read）；它是「**上層已 close、下層讀完 EOF 後可以退出**」的信號。
+
 | 項目 | 規格 |
 |---|---|
 | 檔名 | `.pipeline_end`（固定） |
-| 放置位置 | `src_dir`（即 `/tmp/stream/{session_id}/`）|
+| 放置位置 | `src_dir`（即 `/tmp/stream/{session_id}/`），與 `{session_id}.bin` 同目錄 |
 | 建立者 | Fastify，於收到 `END_` opcode 並呼叫 `streamer.end()` 完成後 |
 | 觸發時機 | `streamer.end()` 的 flush 回呼完成 → `fs.writeFileSync(sentinelPath, '')` |
 | 內容 | 空檔案（不依賴內容，依賴存在性） |
-| `stream_merge` 的處理 | 偵測到後呼叫 `flush_remaining()` → 正常退出（exit 0） |
+| `stream_merge` 的處理 | 偵測到 → 繼續 drain `{session_id}.bin` 剩餘 byte → flush 最後一條 clip → exit 0 |
 | 清理責任 | `pipeline_dispatcher` 在三個 applet 全部退出後，rm `.pipeline_end` 與整個 `src_dir`（若啟用 TTL 清理）|
 
-### 4.1 為何用 sentinel 而非 SIGTERM？
+### 4.1 上下層結束順序
+
+```
+t=0     Fastify STRT  → open {session_id}.bin (append) + spawn dispatcher
+t=0→T   Fastify DATA × N → append byte                  // 與下層並行
+        stream_merge IN_MODIFY × K → tail-read → emit clip // 同時進行
+t=T     Fastify END_  → streamer.end()
+                       → touch .pipeline_end       (上層先退)
+t=T+ε   stream_merge 偵測 sentinel
+                       → 繼續 read() 直到 EOF       (處理剩餘 byte)
+                       → emit final clip
+                       → exit 0
+        log_parse / clip_store 依序收到 EOF、順勢退出
+        pipeline_dispatcher 收集 waitpid → exit 0    (下層最後退)
+```
+
+### 4.2 為何用 sentinel 而非 SIGTERM / EOF 本身？
 
 | 方案 | 優點 | 缺點 |
 |---|---|---|
-| Sentinel 檔（採用） | 與 inotify 事件迴圈同源、無需訊號處理 | 多一次 filesystem write |
+| Sentinel 檔（採用） | 與 inotify 事件迴圈同源、無需訊號處理；能區分「上層明確 END_」與「WS 意外斷線」| 多一次 filesystem write |
+| 僅靠 EOF | 最少狀態 | `read()` 在 `{session_id}.bin` 上只會返 0，下層無法區分「上層暫停」與「已結束」|
 | SIGTERM | 即時 | 須注入 PID、訊號處理難寫得正確 |
-| WS close 事件 | 概念簡單 | Fastify 與 C 之間無 IPC，無法傳遞 |
+| WS close 事件 | 概念簡單 | Fastify 與 C 之間無 IPC，無法直接傳遞 |
 
 ***
 

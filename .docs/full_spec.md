@@ -61,36 +61,58 @@ Byte offset  長度     內容
 
 | OpCode（4 bytes ASCII） | hex | payload 格式 | C 側對應動作 |
 |---|---|---|---|
-| `STRT` | `0x53545254` | UTF-8 字串 → `eventId` | 建立 `/tmp/stream/{eventId}/` 目錄，準備接收 chunk |
-| `DATA` | `0x44415441` | 原始 binary（h264 / aac raw bytes） | Fastify 寫入 `chunk_NNNN.bin` |
-| `END_` | `0x454E445F` | 空或 UTF-8 確認字串 | Fastify 建立 sentinel + spawn `pipeline_dispatcher` |
-| `JSON` | `0x4A534F4E` | UTF-8 JSON 字串 → metadata | Fastify 寫入 `chunk_NNNN.json` |
+| `STRT` | `0x53545254` | UTF-8 字串 → `eventId` | 建立 `/tmp/stream/{eventId}/` 目錄、開檔 `{eventId}.bin`、**同步 spawn `pipeline_dispatcher`** |
+| `DATA` | `0x44415441` | 原始 binary（h264 / aac raw bytes） | Fastify append 到 `{eventId}.bin`；`stream_merge` 即時從尾端讀取 |
+| `END_` | `0x454E445F` | 空或 UTF-8 確認字串 | Fastify 關檔 + 建立 sentinel；dispatcher 處理剩餘 buffer 後退出 |
+| `JSON` | `0x4A534F4E` | UTF-8 JSON 字串 → metadata | Fastify append 一筆 metadata 檔（`{eventId}.meta.jsonl`，一行一筆） |
 
-#### 3.1.2 v1 chunk 落地檔名規則
+#### 3.1.2 v1 落地檔案結構（single growing blob）
 
-每收到一個 `DATA`/`JSON` packet，Fastify 切一個獨立檔案：
+Fastify 上層**不切割 chunk**。整個 session 的 DATA 是一條連續位元流，append 到單一檔案；下層 `stream_merge` 把它當成持續成長的巨型 buffer，從尾端提取二進位位元（依 codec sync word / NAL boundary 解析），與 Fastify 寫入**並行進行**。
 
 ```
 /tmp/stream/{session_id}/
-    chunk_0000.bin     ← 第 1 個 DATA packet 的 payload
-    chunk_0001.bin     ← 第 2 個 DATA packet 的 payload
-    chunk_0002.json    ← 中間夾雜的 JSON metadata
-    ...
-    .pipeline_end      ← END_ opcode 後建立的 sentinel
+    {session_id}.bin         ← Fastify append-only growing blob（DATA payload 連續寫入）
+    {session_id}.meta.jsonl  ← JSON opcode 累積，一行一筆（可選）
+    .pipeline_end            ← END_ opcode 完成 close() 後建立的 sentinel
 ```
 
-seq 來自 Fastify 的 in-memory 計數器，零填充 4 位數，遞增不重置。`stream_merge` 直接以檔名 seq 解析，**v1 不使用 binary header**（移除原本 `parse_binary_header()` 的依賴）。
+**設計核心**：
 
-#### 3.1.3 Spawn 時機
+- 上層 (Fastify) 與下層 (dispatcher) **同時工作**：上層 append、下層 tail-read。
+- 下層把 `{session_id}.bin` 視為一個巨大的 buffer，自行負責**二進位位元提取**（NAL unit、ADTS frame、sync word 等），不依賴上層切割。
+- 上層基本上一定會先結束（`END_` 後 close 檔案），下層在偵測 sentinel 後**繼續處理剩餘 byte** 直到 EOF，再 emit 最後一條 clip 並 exit 0。
+- 不再使用 `chunk_NNNN.bin` 分檔模式；亦不再依賴 `IN_CLOSE_WRITE` 事件。
 
-Fastify 在收到 `END_` opcode 並完成 `streamer.end()` 後：
+#### 3.1.3 Spawn 時機（STRT 觸發、與上層並行）
 
-1. 建立 sentinel：`fs.writeFileSync('/tmp/stream/{eventId}/.pipeline_end', '')`
-2. `child_process.spawn('./pipeline_dispatcher', [session_id, src_dir, db_path, ttl_seconds])`
+Fastify 在收到 `STRT` opcode 並建立輸出檔之後，**立即** spawn `pipeline_dispatcher`：
 
-**設計選擇**：spawn 放在 `END_` 而非 `STRT`，原因是 v1 的 chunk 落地策略要求資料完整後才啟動 inotify（避免 race condition）。v2 規劃將 spawn 移到 `STRT`、改用 streaming ingestion。
+```typescript
+// STRT handler
+fs.mkdirSync(eventDir, { recursive: true });
+fs.openSync(streamPath, 'a');   // 確保 {eventId}.bin 已存在，避免 stream_merge open 失敗
+spawn('./pipeline_dispatcher', [eventId, eventDir, '/tmp/clips.db', String(ttlSeconds)]);
+```
 
-兩件事互不阻塞：WS 接收與 chunk 落地持續進行，`pipeline_dispatcher` 在獨立 process 中執行，Fastify 透過 exit code 判斷管線是否正常結束。
+之後的 `DATA` packet 由 Fastify 持續 append 到 `{eventId}.bin`；`stream_merge` 在獨立 process 中**同時**從同一檔案 tail-read。兩者透過 filesystem 解耦，無 IPC。
+
+收到 `END_` opcode 時：
+
+1. Fastify 關閉 write stream（`streamer.end()`）
+2. 建立 sentinel：`fs.writeFileSync(path.join(eventDir, '.pipeline_end'), '')`
+3. **不再 spawn**（dispatcher 已在 `STRT` 階段啟動）
+
+上層基本上一定先結束；下層 dispatcher 在偵測 sentinel 後 drain 剩餘 byte → flush 最後一條 clip → exit 0，是整條鏈最後退出的角色。Fastify 透過 dispatcher 的 exit code 判斷整體成功與否。
+
+**為何不用 `END_` 觸發 spawn？**
+
+| 議題 | `END_` 觸發（舊設計） | `STRT` 觸發（現行）|
+|---|---|---|
+| 延遲 | 必須等整段 session 結束才開始處理 | 即時處理，clip 延遲 ≈ buffer window |
+| 上下層耦合 | 高（需 sentinel 才開工）| 低（filesystem 自然解耦）|
+| race condition | inotify 對未完整檔案需小心 | 上層 append、下層 tail-read，POSIX 保證可見性 |
+| 失敗恢復 | dispatcher 沒看到事件就無法重啟 | dispatcher crash 後可重 spawn 從 offset 續讀 |
 
 **介面**：CLI 參數（`argv`）傳入，exit code 傳回。Fastify 監聽 `stderr` 取得診斷訊息。
 
@@ -124,11 +146,21 @@ clip_store    stdin
 
 ***
 ### 3.3 Filesystem → `stream_merge`
-`stream_merge` 透過 `libpipeline` 提供的 `pipeline_watch_dir()` 封裝，以 `inotify` 監聽 `src_dir`（`/tmp/stream/{session_id}/`）。
+`stream_merge` 透過 `libpipeline` 提供的 `pipeline_watch_file()` 封裝，以 `inotify` 監聽單一檔案 `{session_id}.bin` 的 `IN_MODIFY` 事件（亦即上層 append 動作）。
 
-觸發事件：`IN_CLOSE_WRITE`（Fastify `writeStream` 關閉 chunk 檔案時）
+```
+Fastify append byte ──▶ {session_id}.bin ──IN_MODIFY──▶ stream_merge tail-read
+                                ▲
+                       (filesystem 為解耦邊界)
+```
 
-每次事件觸發，`stream_merge` 讀取新抵達的 chunk 檔，進行品質檢查、gap 偵測、buffer 累積，每滿 5s 或偵測到 gap 時，輸出一條 clip JSON Line 到 `pipe_1`。
+每次事件觸發，`stream_merge`：
+
+1. 從上次的 offset 繼續 `read()` 新到的位元流
+2. 在內部 buffer 上做**二進位位元提取**（NAL unit / ADTS sync 等）
+3. 累積至 buffer window（預設 5s）或偵測到 gap 時，emit 一條 clip JSON Line 到 `pipe_1`
+
+當看到 sibling sentinel `.pipeline_end` 時：drain 剩餘 buffer → flush 最後一條 clip → exit 0。
 
 **介面**：`inotify` 事件（filesystem 邊界），`pipe_1` stdout（與 `log_parse` 的邊界）。
 
