@@ -1,8 +1,28 @@
 # `stream-merge` — 細部開發文件 v1.0
 
 > **對應檔案**：`applets/stream_merge.c`
-> **版本**：v1.0 / 2026-05-11
+> **版本**：v1.0 / 2026-05-11（v1.1 補入 simplified ingest，2026-05-18）
 > **定位**：`stream-merge` 是整個 Data Analyzer 管線的**唯一資料讀取者**。它透過 inotify 監聽 filesystem，主動累積 chunk、偵測 gap、切割 clips、提取 events，並將結果以 JSON Lines 形式輸出到 stdout。
+
+***
+
+## 零、v1 Simplified Ingest（與 Fastify 對齊）
+
+為快速完成 v1，`stream-merge` 的 ingest 層對齊 Fastify (`edge-ws-host`) 實際落地行為，**簡化如下**：
+
+| 項目 | v1 行為 | v2 規劃 |
+|---|---|---|
+| chunk 檔名 | `chunk_NNNN.bin` / `chunk_NNNN.json`（4 位 seq）| 加上 `.h264` / `.aac` 分流 |
+| seq 取得 | 直接從檔名解析（`sscanf(name, "chunk_%04d.%*s", &seq)`）| 從 binary header `seq` 欄位 |
+| binary header | **不解析**，整個檔案內容 = payload | 解析 stream_type、ts、crc32 |
+| `ChunkEntry.crc32` | 空（0）| header 解析後填入 |
+| `ChunkEntry.is_corrupted` | 永遠 0（除非 `--quality-check` flag）| CRC 校驗結果 |
+| `ChunkEntry.stream_type` | 副檔名判斷：`.bin` → VIDEO、`.json` → META | header 欄位 |
+| sentinel | 偵測 `.pipeline_end`（呼叫 `pipeline_is_sentinel()`）→ flush + exit 0 | 同 v1 |
+
+**契約**：`stream-merge` 在 v1 不再呼叫 `parse_binary_header()`。本文件後續章節中提到 binary header 的部分，在 v1 程式碼路徑被 `#ifdef V1_SIMPLIFIED_INGEST` 包住或直接 stub 為 no-op。
+
+***
 
 ***
 

@@ -1,5 +1,5 @@
 # socket-data-analyzer-c — v1 System Spec
-> **版本**：v1.0 / 2026-05-11
+> **版本**：v1.1 / 2026-05-18（補入 WS packet 格式、chunk 命名、spawn 時機）
 > **定位**：本文件描述 `socket-data-analyzer-c` 子系統各模組之間的連動關係與介面契約。不涉及各模組的實作細節，細節請參閱對應的細部開發文件。
 
 ***
@@ -46,14 +46,57 @@ flowchart TD
 ***
 ## 三、模組間連動說明
 ### 3.1 Fastify → `pipeline_dispatcher`
-Fastify 在收到 WS `video-in` frame 後，同步執行兩件事：
 
-1. 透過 `writeStream` 將解析後的 chunk 寫入 `/tmp/stream/{session_id}/` 目錄
-2. 以 `child_process.spawn()` 啟動 `pipeline_dispatcher`，傳入四個參數：`session_id`、`src_dir`、`db_path`、`ttl`
+#### 3.1.1 WS Packet 格式（上層輸入）
+
+Fastify (`edge-ws-host` repo) 從 ESP32-S3 收到的 WS binary frame 結構：
+
+```
+Byte offset  長度     內容
+──────────── ──────── ─────────────────────────────────
+0 ~ 3        4 bytes  opCode（ASCII 字串）
+4 ~ 7        4 bytes  payloadSize（UInt32BE）
+8 ~ N        N bytes  payload（依 opCode 決定格式）
+```
+
+| OpCode（4 bytes ASCII） | hex | payload 格式 | C 側對應動作 |
+|---|---|---|---|
+| `STRT` | `0x53545254` | UTF-8 字串 → `eventId` | 建立 `/tmp/stream/{eventId}/` 目錄，準備接收 chunk |
+| `DATA` | `0x44415441` | 原始 binary（h264 / aac raw bytes） | Fastify 寫入 `chunk_NNNN.bin` |
+| `END_` | `0x454E445F` | 空或 UTF-8 確認字串 | Fastify 建立 sentinel + spawn `pipeline_dispatcher` |
+| `JSON` | `0x4A534F4E` | UTF-8 JSON 字串 → metadata | Fastify 寫入 `chunk_NNNN.json` |
+
+#### 3.1.2 v1 chunk 落地檔名規則
+
+每收到一個 `DATA`/`JSON` packet，Fastify 切一個獨立檔案：
+
+```
+/tmp/stream/{session_id}/
+    chunk_0000.bin     ← 第 1 個 DATA packet 的 payload
+    chunk_0001.bin     ← 第 2 個 DATA packet 的 payload
+    chunk_0002.json    ← 中間夾雜的 JSON metadata
+    ...
+    .pipeline_end      ← END_ opcode 後建立的 sentinel
+```
+
+seq 來自 Fastify 的 in-memory 計數器，零填充 4 位數，遞增不重置。`stream_merge` 直接以檔名 seq 解析，**v1 不使用 binary header**（移除原本 `parse_binary_header()` 的依賴）。
+
+#### 3.1.3 Spawn 時機
+
+Fastify 在收到 `END_` opcode 並完成 `streamer.end()` 後：
+
+1. 建立 sentinel：`fs.writeFileSync('/tmp/stream/{eventId}/.pipeline_end', '')`
+2. `child_process.spawn('./pipeline_dispatcher', [session_id, src_dir, db_path, ttl_seconds])`
+
+**設計選擇**：spawn 放在 `END_` 而非 `STRT`，原因是 v1 的 chunk 落地策略要求資料完整後才啟動 inotify（避免 race condition）。v2 規劃將 spawn 移到 `STRT`、改用 streaming ingestion。
 
 兩件事互不阻塞：WS 接收與 chunk 落地持續進行，`pipeline_dispatcher` 在獨立 process 中執行，Fastify 透過 exit code 判斷管線是否正常結束。
 
 **介面**：CLI 參數（`argv`）傳入，exit code 傳回。Fastify 監聽 `stderr` 取得診斷訊息。
+
+#### 3.1.4 session_id 對齊
+
+`full_spec.md` 使用的 `session_id` 與 Fastify 程式碼的 `eventId` 語意相同。v1 直接以 `eventId` 字串作為 `session_id` 傳入 `pipeline_dispatcher`，**不需要轉換或映射**。
 
 ***
 ### 3.2 `pipeline_dispatcher` → 三個 applet
@@ -117,7 +160,14 @@ Agent 不在本子系統範疇內，透過兩種方式消費 `clip_store` 的輸
 **介面**：`clips.db` 純文字 key-value 檔案，或 stdout JSON Lines（即時管線模式）。
 
 ***
-### 3.7 `stream_logger`（橫切面依賴）
+### 3.7 `libpipeline`（共用基礎函式庫）
+
+所有 applet 共用的基礎函式庫，封裝 inotify 監聽、時間取得、JSON 壓縮、sentinel 判別。詳見 [libpipeline-v1.0](libpipeline-v1.0)。
+
+**重點**：sentinel 檔名固定為 `.pipeline_end`，由 Fastify 建立、`stream_merge` 透過 `pipeline_is_sentinel()` 判別、`pipeline_dispatcher` 在管線收束後清理。
+
+***
+### 3.8 `stream_logger`（橫切面依賴）
 `stream_logger` 是所有模組共用的日誌函式庫，不參與業務資料流。各模組透過 `#include "stream_logger.h"` 引入，使用 `LOG_INFO()`、`LOG_WARN()` 等巨集輸出診斷訊息。
 
 **約定**：所有診斷訊息只走 **stderr**，不污染任何 pipe 的 stdout 資料流。
