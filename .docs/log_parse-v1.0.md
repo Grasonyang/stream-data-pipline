@@ -26,7 +26,10 @@ log_parse --regex <pattern> --fields <f1,f2,...> --format json [--filter key=val
 log_parse --regex <pattern> --fields <f1,f2,...> --format csv  [--filter key=value]
 ```
 
-`--regex` 使用 POSIX regex。欄位名稱由 `--fields` 提供，依 capture group 順序對應。
+`--regex` 使用 POSIX Extended Regular Expressions (ERE)。實作應以
+`regcomp(..., REG_EXTENDED)` 編譯 pattern，讓 `()`、`+` 等 ERE 語法與
+文件範例一致。欄位名稱由 `--fields` 提供，依 `regmatch_t` 的
+`match[1..N]` capture group 順序對應。
 
 範例 input：
 
