@@ -37,9 +37,9 @@ stream_merge --src <src_dir> --session <session_id>
 ## Exit Codes
 
 - `0`：所有 child processes 正常退出。
-- `1`：參數錯誤。
-- `2`：pipe / fork / exec setup 失敗。
-- `3`：任一 child process 非 0 exit 或被 signal 結束。
+- `2`：參數錯誤（`argc != 5`）。
+- `-1`：pipe / fork setup 失敗（含 child spawn fail）。
+- `-2`：任一 child process 非 0 exit、被 signal 結束，或 `waitpid()` 失敗。
 
 ## Implementation Notes
 
@@ -50,7 +50,7 @@ stream_merge --src <src_dir> --session <session_id>
 
 ## Local Test Focus
 
-- 參數不足時回傳 `1`。
-- pipe / fork failure path 有清理已開 fd。
-- 任一 child exit non-zero 時 dispatcher 回傳 `3`。
+- 參數不足時回傳 `2`。
+- pipe / fork failure path 有清理已開 fd，並回傳 `-1`。
+- 任一 child exit non-zero 時 dispatcher 回傳 `-2`。
 - 正常 EOF cascade 不留下 zombie process。
