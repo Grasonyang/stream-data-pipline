@@ -10,6 +10,7 @@
 - 寫入 `--db` 指定的純文字 index。
 - 支援 TTL。
 - 提供 repo-local 查詢 / GC CLI。
+- 解析失敗的輸入行寫 stderr warning，並略過該行。
 
 ## Required Integration Mode
 
@@ -26,37 +27,44 @@ stdin input example：
 ## DB Format
 
 `/tmp/clips.db` 是純文字檔，不是 SQLite。
-
-```text
-key<TAB>value<TAB>expire_at<NEWLINE>
-```
-
 範例：
 
 ```text
-sess_001:1747065600	/tmp/clips/sess_001/1747065600.mp4	1747069200
+sess_001:1747065600	/tmp/clips/sess_001/1747065600.mp4 1747069200
 ```
 
 ## Write Semantics
 
 - key 格式：`session_id:ts`。
-- 相同 key 再寫入採 upsert 語意。
-- 可用 append-only + GC 去重實作。
-- rewrite / GC 應使用 tmp file + fsync + rename，避免 crash 造成半寫入。
+- 相同 key 再寫入採 latest-write-wins 語意；`--get` 會掃描最後一筆該 key。
+- 寫入路徑目前是 append-only；`--gc` 會重寫檔案，保留每個 key 最新且未過期的 row。
+- `expire_at` 由每次寫入當下時間加上 `--ttl` 決定。
+- 目前 `--gc` 是 in-place rewrite + `fsync()`，不是 tmp file + rename crash-safe replace。
 
 ## Optional Repo-Local Modes
 
 以下 CLI 是 repo 內部管理用途，不是跨 repo contract：
 
 - `--get <key>`
-- `--list [--filter <expr>]`
-- `--delete <key>`
 - `--gc`
+
+目前尚未實作：
+
+- `--list`
+- `--delete`
 
 ## Stdout / Stderr Rule
 
-- stdout：操作結果 JSON，或查詢結果。
-- stderr：diagnostic log。
+- stdout：`--get` 時輸出查詢到的 raw path；一般 ingest / `--gc` 成功時不輸出內容。
+- stderr：diagnostic log 與 malformed clip warning。
+
+因此它目前比較像 pipeline sink + repo-local maintenance CLI，而不是完整 CRUD shell tool。
+
+## Locking And Expiry
+
+- process 啟動後會對 db 檔案拿 `flock(LOCK_EX)`，避免多個 writer 同時破壞檔案內容。
+- `--get` 只回傳尚未過期的最新 row；過期資料即使還在檔案中，也不會回傳。
+- `--gc` 才會實際把過期資料與舊版本 row 從檔案中清掉。
 
 ## Local Test Focus
 
