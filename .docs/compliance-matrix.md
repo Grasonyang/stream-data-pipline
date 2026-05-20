@@ -31,7 +31,7 @@
 | 使用 sentinel 表示 stream 結束並 drain final bytes | Done | `stream_merge`, `libpipeline` | `.pipeline_end` behavior documented; stream_merge tests cover drain behavior | None for current baseline |
 | 方向三：輕量級資料儲存引擎 | Done | `applets/clip_store.c` | file-backed index at `--db`; `tests/test_clip_store.sh` | v2.1 should keep docs honest about supported CRUD surface |
 | File-backed key-value index | Done | `clip_store` | DB format documented as `key<TAB>value<TAB>expire_at`; tests cover append/get | None for course baseline |
-| TTL and GC behavior | Done | `clip_store --ttl`, `clip_store --gc` | README testing section; `tests/test_clip_store.sh` | GRA-16 should avoid overstating crash-safety if not fully implemented |
+| TTL and GC behavior | Done | `clip_store --ttl`, `clip_store --gc` | README testing section; `tests/test_clip_store.sh` | TTL=0 semantics fixed in v2.1 (GRA-21): now means never-expires (`expire_at=0` sentinel). GC crash-safety (in-place rewrite) still to be addressed in GRA-25. |
 | Concurrent write safety | Partial | `clip_store`, file locking behavior | tests mention concurrent writes; README lists coverage | v2.1 should verify/extend lock semantics if final demo stresses concurrency |
 | 提取共用邏輯為內部函式庫 | Done | `lib/libpipeline.*`, `lib/stream_logger.*` | `tests/test_libpipeline.c`, `tests/test_stream_logger.c`; `.docs/libpipeline-v1.0.md` | None for current baseline |
 | applet CLI 有清楚 usage/help 方向 | Partial | applet docs, README commands | README documents primary commands; applet docs document expected CLI shape | GRA-19 should add man/help document skeleton and final help contract |

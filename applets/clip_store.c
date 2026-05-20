@@ -166,7 +166,7 @@ static int load_latest(FILE *fp, const char *key, row_t *out, long now)
     }
     free(line);
 
-    if (!found || out->expire_at <= now) {
+    if (!found || (out->expire_at != 0 && out->expire_at <= now)) {
         return 0;
     }
     return 1;
@@ -239,7 +239,7 @@ static int rewrite_gc(FILE *fp, long now)
         return -1;
     }
     for (size_t i = 0; i < len; ++i) {
-        if (rows[i].expire_at > now && fprintf(fp, "%s\t%s\t%ld\n", rows[i].key, rows[i].value, rows[i].expire_at) < 0) {
+        if ((rows[i].expire_at == 0 || rows[i].expire_at > now) && fprintf(fp, "%s\t%s\t%ld\n", rows[i].key, rows[i].value, rows[i].expire_at) < 0) {
             return -1;
         }
     }
@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
             if (pipeline_buffer_append_str(&key, session) != 0 ||
                 pipeline_buffer_append_char(&key, ':') != 0 ||
                 pipeline_buffer_append_str(&key, ts) != 0 ||
-                append_row(fp, key.data, path, row_now + ttl) != 0) {
+                append_row(fp, key.data, path, ttl == 0 ? 0 : row_now + ttl) != 0) {
                 LOG_ERROR("write db failed: %s", strerror(errno));
                 rc = 1;
                 pipeline_buffer_free(&key);

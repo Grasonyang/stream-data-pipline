@@ -14,7 +14,7 @@ v2.1 的目標是讓目前可跑的 C pipeline 更穩、更一致，並把已知
 
 | Gap | Why It Matters | Planned Issue | Required For Assignment |
 | --- | --- | --- | --- |
-| `clip_store --ttl 0` 目前代表立即過期，但 milestone 期望可表達不過期 | TTL 語意會影響 demo、測試與使用者理解 | GRA-21 | Yes |
+| ~~`clip_store --ttl 0` 目前代表立即過期，但 milestone 期望可表達不過期~~ **Done (v2.1)**: `--ttl 0` 改為永不過期，`expire_at=0` 為 sentinel，`--get` 與 `--gc` 均保留該 row | TTL 語意會影響 demo、測試與使用者理解 | GRA-21 | Yes |
 | `pipeline_dispatcher` child exec path / failure propagation 仍可更明確 | final demo 需要能說明 fork/exec/waitpid、exit code 與 failure behavior | GRA-22 | Yes |
 | JSON/key parsing helper 分散在 `log_parse` 與 `clip_store` | 重複 ad-hoc parsing 會讓後續修 edge case 變難 | GRA-23 | Optional but useful |
 | `stream_merge` 尚未達到提案書中的核心切割能力：5s 主動切割、chunk 序號 gap FSM、partial clip、idle timeout、CRC32/去重、meta events extraction | 提案書把 `stream-merge` 定義為核心 applet；但正確 contract 下 `.bin` 應是 binary video bytes，current baseline 卻把 growing file 當 JSON object blob 處理，這不只是功能不足，也是 input model mismatch | GRA-24 | Yes |
