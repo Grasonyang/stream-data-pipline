@@ -19,15 +19,15 @@ check_eq() {
 printf '%s\n' '{"type":"clip","session_id":"sess_001","ts":1747065600,"path":"/tmp/one.mp4"}' |
     "$CLIP_STORE" --db "$DB" --ttl 300 >"$TMP_DIR/write.out" 2>"$TMP_DIR/write.err"
 check_eq "pipe write stdout" "" "$(cat "$TMP_DIR/write.out")"
-check_eq "pipe write get" "/tmp/one.mp4" "$($CLIP_STORE --db "$DB" --get sess_001:1747065600)"
+check_eq "pipe write get" "/tmp/one.mp4" "$("$CLIP_STORE" --db "$DB" --get sess_001:1747065600)"
 
 printf '%s\n' '{"type":"clip","session_id":"sess_001","ts":1747065600,"path":"/tmp/two.mp4"}' |
     "$CLIP_STORE" --db "$DB" --ttl 300
-check_eq "upsert latest value" "/tmp/two.mp4" "$($CLIP_STORE --db "$DB" --get sess_001:1747065600)"
+check_eq "upsert latest value" "/tmp/two.mp4" "$("$CLIP_STORE" --db "$DB" --get sess_001:1747065600)"
 
 printf '%s\n' '{"type":"clip","session_id":"sess_001","ts":1747065601,"path":"/tmp/no_expire.mp4"}' |
     "$CLIP_STORE" --db "$DB" --ttl 0
-check_eq "ttl=0 never expires get" "/tmp/no_expire.mp4" "$($CLIP_STORE --db "$DB" --get sess_001:1747065601)"
+check_eq "ttl=0 never expires get" "/tmp/no_expire.mp4" "$("$CLIP_STORE" --db "$DB" --get sess_001:1747065601)"
 
 "$CLIP_STORE" --db "$DB" --gc
 check_eq "gc removes duplicates, keeps never-expire rows" "2" "$(wc -l <"$DB" | tr -d ' ')"
