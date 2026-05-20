@@ -207,19 +207,17 @@ static int process_meta_record(const meta_record_t *rec, clip_state_t *s,
     /* continuity ok — check time window */
     int64_t span = rec->ts_ms - s->start_ts_ms;
     if (span >= clip_ms) {
-        /* time window full → emit complete + reset + start fresh with this chunk */
-        s->end_ts_ms     = rec->ts_ms;
-        s->total_length += rec->length;
+        /* OLD clip emitted at accumulated state, NOT including triggering chunk */
         if (emit_clip(s, src, session, 1) != 0) return -1;
         clip_reset(s);
-
-        s->active           = 1;
-        s->start_ts_ms      = rec->ts_ms;
-        s->end_ts_ms        = rec->ts_ms;
-        s->start_offset     = rec->offset;
-        s->total_length     = rec->length;
-        s->next_seq         = rec->seq + 1;
-        s->next_offset      = rec->offset + rec->length;
+        /* NEW clip starts with the triggering chunk */
+        s->active             = 1;
+        s->start_ts_ms        = rec->ts_ms;
+        s->end_ts_ms          = rec->ts_ms;
+        s->start_offset       = rec->offset;
+        s->total_length       = rec->length;
+        s->next_seq           = rec->seq + 1;
+        s->next_offset        = rec->offset + rec->length;
         s->last_chunk_wall_ms = now_ms;
         return 0;
     }
@@ -399,25 +397,62 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    int meta_fd = open(meta_path, O_RDONLY);
-    if (meta_fd < 0) {
-        LOG_ERROR("open %s: %s", meta_path, strerror(errno));
+    /* Open dir_fd FIRST so we can poll for meta file appearance if needed */
+    int dir_wd = -1;
+    int dir_fd = pipeline_open_dir_watch(src, &dir_wd);
+    if (dir_fd < 0) {
+        LOG_ERROR("inotify dir watch failed: %s", strerror(errno));
         close(bin_fd);
         return 1;
     }
 
-    /* inotify: directory (sentinel) + meta file (new records) */
-    int dir_wd = -1, meta_wd = -1;
-    int dir_fd  = pipeline_open_dir_watch(src, &dir_wd);
+    int meta_fd = open(meta_path, O_RDONLY);
+    if (meta_fd < 0 && errno == ENOENT) {
+        LOG_INFO("meta file not yet present, waiting up to 5s");
+        int64_t deadline = pipeline_get_monotonic_time_ms() + 5000;
+        while (meta_fd < 0) {
+            int64_t remaining = deadline - pipeline_get_monotonic_time_ms();
+            if (remaining <= 0) {
+                LOG_ERROR("timed out waiting for %s", meta_path);
+                close(dir_fd);
+                close(bin_fd);
+                return 1;
+            }
+            struct pollfd wpfd = { .fd = dir_fd, .events = POLLIN };
+            int prc = poll(&wpfd, 1, (int)remaining);
+            if (prc < 0) {
+                if (errno == EINTR) continue;
+                LOG_ERROR("poll waiting for meta: %s", strerror(errno));
+                close(dir_fd);
+                close(bin_fd);
+                return 1;
+            }
+            if (prc > 0) {
+                char ibuf[4096];
+                ssize_t nr = read(dir_fd, ibuf, sizeof(ibuf));
+                (void)nr;  /* drain to unblock next poll; result intentionally ignored */
+            }
+            meta_fd = open(meta_path, O_RDONLY);
+        }
+        LOG_INFO("meta file appeared");
+    } else if (meta_fd < 0) {
+        LOG_ERROR("open %s: %s", meta_path, strerror(errno));
+        close(dir_fd);
+        close(bin_fd);
+        return 1;
+    }
+
+    int meta_wd = -1;
     int meta_wfd = pipeline_open_file_watch(meta_path, &meta_wd);
-    if (dir_fd < 0 || meta_wfd < 0) {
-        LOG_ERROR("inotify setup failed: %s", strerror(errno));
-        if (dir_fd  >= 0) close(dir_fd);
-        if (meta_wfd >= 0) close(meta_wfd);
+    if (meta_wfd < 0) {
+        LOG_ERROR("inotify meta watch failed: %s", strerror(errno));
+        close(dir_fd);
         close(meta_fd);
         close(bin_fd);
         return 1;
     }
+
+    LOG_INFO("inotify ready");
 
     pipeline_buffer_t meta_buf = {0};
     clip_state_t      clip     = {0};
