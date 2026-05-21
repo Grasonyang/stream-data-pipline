@@ -46,7 +46,7 @@ sleep 0.1
 
 # One chunk with ts_ms=7000 → ts=7 in the clip record.
 printf '\x00\x01\x02\x03\x04' >>"$TMP_DIR/$SESSION.bin"
-printf '{"kind":"data","seq":1,"offset":0,"length":5,"ts_ms":7000}\n' \
+printf '{"kind":"data","sequence":1,"offset":0,"length":5,"ts_ms":7000}\n' \
     >>"$TMP_DIR/$SESSION.meta.jsonl"
 touch "$TMP_DIR/.pipeline_end"
 wait "$pid"

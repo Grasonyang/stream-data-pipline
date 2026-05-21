@@ -3,23 +3,21 @@ sidebar:
     items:
       - title: Home
         page: Home
-      - title: Internal Spec
-        page: full_spec
+      - title: Core Docs
+        items:
+          - title: Overview
+            page: core/overview
+          - title: Compliance
+            page: core/compliance
       - title: C Entry Point
         items:
           - title: Pipeline Dispatcher
-            page: pipeline_dispatcher-v1.0
+            page: applets/pipeline-dispatcher
       - title: BusyBox Applets
         items:
           - title: Stream Merge
-            page: stream_merge-v1.0
+            page: applets/stream-merge
           - title: Log Parse
-            page: log_parse-v1.0
+            page: applets/log-parse
           - title: Clip Store
-            page: clip_store-v1.0
-      - title: Shared Libraries
-        items:
-          - title: Lib Pipeline
-            page: libpipeline-v1.0
-          - title: Stream Logger
-            page: stream_logger-v1.0
+            page: applets/clip-store
