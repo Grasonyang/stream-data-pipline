@@ -36,7 +36,7 @@
 
 typedef struct {
     char     kind[16];
-    uint64_t seq;
+    uint64_t sequence;
     uint64_t offset;
     uint64_t length;
     int64_t  ts_ms;
@@ -76,11 +76,11 @@ static int parse_meta_record(const char *line, size_t len, meta_record_t *out)
         out->kind[ki++] = *p++;
     out->kind[ki] = '\0';
 
-    /* seq */
-    p = find_field(line, "seq");
+    /* sequence */
+    p = find_field(line, "sequence");
     if (!p) return -1;
     char *end;
-    out->seq = (uint64_t)strtoull(p, &end, 10);
+    out->sequence = (uint64_t)strtoull(p, &end, 10);
     if (end == p) return -1;
 
     /* offset */
@@ -113,7 +113,7 @@ typedef struct {
     int64_t  end_ts_ms;
     uint64_t start_offset;
     uint64_t total_length;
-    uint64_t next_seq;
+    uint64_t next_sequence;
     uint64_t next_offset;
     int64_t  last_chunk_wall_ms;  /* monotonic ms when last chunk arrived */
 } clip_state_t;
@@ -174,21 +174,21 @@ static int process_meta_record(const meta_record_t *rec, clip_state_t *s,
         s->end_ts_ms        = rec->ts_ms;
         s->start_offset     = rec->offset;
         s->total_length     = rec->length;
-        s->next_seq         = rec->seq + 1;
+        s->next_sequence    = rec->sequence + 1;
         s->next_offset      = rec->offset + rec->length;
         s->last_chunk_wall_ms = now_ms;
         return 0;
     }
 
     /* SM_COLLECTING: check continuity */
-    int seq_ok    = (rec->seq    == s->next_seq);
+    int sequence_ok = (rec->sequence == s->next_sequence);
     int offset_ok = (rec->offset == s->next_offset);
 
-    if (!seq_ok || !offset_ok) {
+    if (!sequence_ok || !offset_ok) {
         /* continuity break → emit partial + reset + start fresh */
-        LOG_WARN("continuity break seq=%" PRIu64 " (expected %" PRIu64
+        LOG_WARN("continuity break sequence=%" PRIu64 " (expected %" PRIu64
                  ") offset=%" PRIu64 " (expected %" PRIu64 ")",
-                 rec->seq, s->next_seq, rec->offset, s->next_offset);
+                 rec->sequence, s->next_sequence, rec->offset, s->next_offset);
         if (emit_clip(s, src, session, 0) != 0) return -1;
         clip_reset(s);
 
@@ -198,7 +198,7 @@ static int process_meta_record(const meta_record_t *rec, clip_state_t *s,
         s->end_ts_ms        = rec->ts_ms;
         s->start_offset     = rec->offset;
         s->total_length     = rec->length;
-        s->next_seq         = rec->seq + 1;
+        s->next_sequence    = rec->sequence + 1;
         s->next_offset      = rec->offset + rec->length;
         s->last_chunk_wall_ms = now_ms;
         return 0;
@@ -216,7 +216,7 @@ static int process_meta_record(const meta_record_t *rec, clip_state_t *s,
         s->end_ts_ms          = rec->ts_ms;
         s->start_offset       = rec->offset;
         s->total_length       = rec->length;
-        s->next_seq           = rec->seq + 1;
+        s->next_sequence      = rec->sequence + 1;
         s->next_offset        = rec->offset + rec->length;
         s->last_chunk_wall_ms = now_ms;
         return 0;
@@ -225,7 +225,7 @@ static int process_meta_record(const meta_record_t *rec, clip_state_t *s,
     /* accumulate */
     s->end_ts_ms      = rec->ts_ms;
     s->total_length  += rec->length;
-    s->next_seq       = rec->seq + 1;
+    s->next_sequence  = rec->sequence + 1;
     s->next_offset    = rec->offset + rec->length;
     s->last_chunk_wall_ms = now_ms;
     return 0;

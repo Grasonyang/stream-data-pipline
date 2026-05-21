@@ -41,7 +41,7 @@ pipeline_dispatcher
 每個 process 的角色：
 
 - `pipeline_dispatcher`：建立 pipe、spawn child、回收 exit status。
-- `stream_merge`：正確設計下應從 growing binary stream 搭配 metadata sidecar 產生 clip metadata JSON Lines；目前 baseline implementation 仍有 fixture-driven mismatch，詳見 `stream_merge-v1.0` 與 `v2-gap-list`。
+- `stream_merge`：從 `.meta.jsonl` metadata sidecar 產生 clip byte-range metadata JSON Lines，並驗證 session `.bin` 存在；v2.1 不讀取 `.bin` byte 內容，也不切出實體 mp4 小檔。
 - `log_parse`：對上游 structured records 做 parse / filter / reformat。
 - `clip_store`：把 clip records 寫入 file-backed index，並支援 TTL / GC。
 
@@ -55,7 +55,7 @@ pipeline_dispatcher
 4. `stream_merge` 從 session `.bin` buffer 抽出 5s 等時間窗對應的 byte range，輸出 clip metadata records 到 stdout。
 5. `log_parse` 從 stdin 讀取 records，保留 `type=clip` 或做格式轉換。
 6. `clip_store` 從 stdin 讀取 clip JSON Lines，寫入 `db_path`。
-7. `.pipeline_end` 出現後，`stream_merge` drain 剩餘 bytes 並結束；下游跟著 EOF 收束。
+7. `.pipeline_end` 出現後，`stream_merge` drain 剩餘 metadata records 並結束；下游跟著 EOF 收束。
 
 這個 repo 的重點不是 packet ingress，而是把已存在的 session data 透過 UNIX pipeline 收斂成可查詢的 clip index。
 

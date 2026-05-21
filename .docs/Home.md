@@ -45,7 +45,7 @@
 - `compliance-matrix`：作業 B + 方向三要求對照表，含完成狀態與 follow-up routing。
 - `v2-gap-list`：v2.1/v2.2 缺口列表與 Linear issue planning。
 - `pipeline_dispatcher-v1.0`：entry point、fork/exec、pipe topology、exit code。
-- `stream_merge-v1.0`：讀取 growing blob、sentinel、clip JSON Lines。
+- `stream_merge-v1.0`：讀取 `.meta.jsonl` sidecar、監聽 sentinel、輸出 clip byte-range metadata JSON Lines。
 - `log_parse-v1.0`：regex-based 結構化日誌解析、JSON/CSV 輸出、integration filter。
 - `clip_store-v1.0`：純文字 index、TTL、GC 與查詢行為。
 - `libpipeline-v1.0`：共用低階 helper，例如 inotify watch 與 sentinel helper。

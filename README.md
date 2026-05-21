@@ -105,7 +105,7 @@ make clean     # 移除 build artifacts
 - `libpipeline` inotify、buffer、sentinel helpers。
 - `stream_logger` stderr-only logging。
 - `log_parse` regex parsing、JSON/CSV output、filter 行為。
-- `stream_merge` growing file drain 與 sentinel 行為。
+- `stream_merge` `.meta.jsonl` sidecar drain、5s window、continuity 與 sentinel 行為。
 - `clip_store` append/get/TTL/GC/concurrent writes。
 - `pipeline_dispatcher` process orchestration 與 end-to-end DB 寫入。
 
@@ -113,16 +113,16 @@ make clean     # 移除 build artifacts
 
 最小 end-to-end 使用方式：
 
-注意：下面仍是 repo-local baseline fixture，直接把 JSON object 寫進 `.bin` 只為了讓目前測試與最小 demo 能跑通。v2.1 的正確 cross-repo contract 不是這個 shape，而是由 `edge-ws-host` 用 WebSocket/TCP 接收資料後，落 `{session_id}.bin + {session_id}.meta.jsonl + .pipeline_end`。
-
 ```bash
 make
 rm -rf /tmp/stream/demo /tmp/clips.db
 mkdir -p /tmp/stream/demo
 : > /tmp/stream/demo/demo.bin
+: > /tmp/stream/demo/demo.meta.jsonl
 ./build/pipeline_dispatcher demo /tmp/stream/demo /tmp/clips.db 300 &
 pid=$!
-printf '%s' '{"type":"clip","session_id":"demo","ts":1,"path":"/tmp/demo.mp4"}' >> /tmp/stream/demo/demo.bin
+printf '\x00\x01\x02\x03' >> /tmp/stream/demo/demo.bin
+printf '%s\n' '{"kind":"data","sequence":1,"offset":0,"length":4,"ts_ms":1000}' >> /tmp/stream/demo/demo.meta.jsonl
 touch /tmp/stream/demo/.pipeline_end
 wait "$pid"
 cat /tmp/clips.db
@@ -136,7 +136,7 @@ cat /tmp/clips.db
 .
 |-- applets/
 |   |-- pipeline_dispatcher.c   # fork + pipe + exec orchestration
-|   |-- stream_merge.c          # growing file reader and JSONL framing
+|   |-- stream_merge.c          # sidecar-driven clip metadata emitter
 |   |-- log_parse.c             # regex parser, JSON/CSV formatter, record filter
 |   `-- clip_store.c            # file-backed clip index
 |-- lib/
@@ -149,10 +149,10 @@ cat /tmp/clips.db
 
 ## 目前狀態
 
-v1 已完成 repo-local pipeline baseline：
+目前 repo 已完成可測試的 pipeline baseline：
 
 - `pipeline_dispatcher` 可建立 `stream_merge -> log_parse -> clip_store` process pipeline。
-- `stream_merge` 可讀取 append-only stream、觀察 sentinel、輸出 clip JSON Lines；但 v2.1 仍要把它收斂到 `.bin + .meta.jsonl` contract。
+- `stream_merge` 可讀取 `.meta.jsonl` sidecar、驗證 session `.bin` 存在、做時間窗與 continuity 檢查，並輸出 clip byte-range metadata JSON Lines；CRC、events merge 與實體 mp4 clip extraction 留作 future work。
 - `log_parse` 可做 regex parsing、JSON/CSV output 與 JSONL filter。
 - `clip_store` 可寫入 file-backed index，並支援查詢、TTL、GC。
 - `libpipeline` 與 `stream_logger` 提供 applet 共用低階 helper。

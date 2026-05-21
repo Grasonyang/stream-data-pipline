@@ -43,13 +43,13 @@ stream_merge --src <src_dir> --session <session_id>
 每行一個 JSON object，以 `\n` 結尾：
 
 ```json
-{"kind":"data","seq":1,"offset":0,"length":4096,"ts_ms":1747065600000}
+{"kind":"data","sequence":1,"offset":0,"length":4096,"ts_ms":1747065600000}
 ```
 
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | `kind` | string | `"data"` 為 binary video chunk；其他 kind（如 `"json"`）目前 skip |
-| `seq` | uint64 | chunk sequence number，從 1 開始，單調遞增 |
+| `sequence` | uint64 | chunk sequence number，從 1 開始，單調遞增 |
 | `offset` | uint64 | 此 chunk 在 `.bin` 中的 byte offset |
 | `length` | uint64 | 此 chunk 的 byte 數 |
 | `ts_ms` | int64 | 此 chunk 的起始時間戳（Unix ms） |
@@ -67,7 +67,7 @@ SM_*  ──sentinel + final drain──▶  emit final clip → exit 0
 
 **Continuity check（兩條件均必須成立）：**
 
-1. `record.seq == state.next_seq`（sequence 連續）
+1. `record.sequence == state.next_sequence`（sequence 連續）
 2. `record.offset == state.next_offset`（offset 連續：前一 chunk 的 `offset + length`）
 
 任一失敗 → emit partial clip + reset + 以觸發 record 開始新 clip。

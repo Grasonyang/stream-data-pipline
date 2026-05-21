@@ -17,7 +17,7 @@ v2.1 的目標是讓目前可跑的 C pipeline 更穩、更一致，並把已知
 | ~~`clip_store --ttl 0` 目前代表立即過期，但 milestone 期望可表達不過期~~ **Done (v2.1)**: `--ttl 0` 改為永不過期，`expire_at=0` 為 sentinel，`--get` 與 `--gc` 均保留該 row | TTL 語意會影響 demo、測試與使用者理解 | GRA-21 | Yes |
 | ~~`pipeline_dispatcher` child exec path / failure propagation 仍可更明確~~ **Done (v2.1)**: spawn 失敗時呼叫 `kill_and_reap()` 清理已啟動的 child；`wait_all()` 加入 pid < 0 guard 避免 `waitpid(-1,...)`；failure behavior 記錄至 pipeline_dispatcher-v1.0.md | final demo 需要能說明 fork/exec/waitpid、exit code 與 failure behavior | GRA-22 | Yes |
 | JSON/key parsing helper 分散在 `log_parse` 與 `clip_store` | 重複 ad-hoc parsing 會讓後續修 edge case 變難 | GRA-23 | Optional but useful |
-| ~~`stream_merge` 尚未達到提案書中的核心切割能力：5s 主動切割、chunk 序號 gap FSM、partial clip、idle timeout、CRC32/去重、meta events extraction~~ **Done (v2.1)**: 改為讀 `.meta.jsonl` sidecar 驅動 byte-range selection；實作 5s 時間窗切割、sequence + offset continuity check、continuity 斷裂時 emit partial clip、idle timeout、SM_IDLE/SM_COLLECTING FSM。CRC32、binary clip 實際抽出、events extraction 標為 future work。 | 提案書把 `stream-merge` 定義為核心 applet；但正確 contract 下 `.bin` 應是 binary video bytes，current baseline 卻把 growing file 當 JSON object blob 處理，這不只是功能不足，也是 input model mismatch | GRA-24 | Yes |
+| ~~`stream_merge` 尚未達到提案書中的核心切割能力：5s 主動切割、chunk 序號 gap FSM、partial clip、idle timeout、CRC32/去重、meta events extraction~~ **Done (v2.1)**: 改為讀 `.meta.jsonl` sidecar 驅動 byte-range selection；實作 5s 時間窗切割、sequence + offset continuity check、continuity 斷裂時 emit partial clip、idle timeout、SM_IDLE/SM_COLLECTING FSM。CRC32、binary clip 實際抽出、events extraction 標為 future work。 | 提案書把 `stream-merge` 定義為核心 applet；v2.1 已修正舊 JSON-in-bin input model mismatch，剩餘項目明確列為 future work | GRA-24 | Yes |
 | ~~`clip_store --gc` 目前是 in-place rewrite + `fsync()`，不是 tmp file + rename~~ **Done (v2.1)**: 改為寫入 `db_path.tmp` → `fsync()` → `rename()` 原子取代，crash 不會造成 DB 遺失 | docs 已誠實標示，但 storage engine 若要更像可防守的作業成果，需要 crash-safety story | GRA-25 | Strongly recommended |
 
 ## v2.2 Scope
@@ -72,7 +72,7 @@ Out of scope unless integration requires it:
 
 ## Proposal-Specific stream_merge Gap
 
-原提案書把 `stream-merge` 定義為核心 applet，目標不只是把 JSON object 從 growing file 裡切出來，而是要處理即時影音 chunk pipeline 的控制語意。
+原提案書把 `stream-merge` 定義為核心 applet，目標不是從 growing file 裡切 JSON object，而是處理即時影音 chunk pipeline 的控制語意。
 
 目前先以 ESP32 -> `edge-ws-host` 的持久 WebSocket/TCP ingress 為主。這表示 v2.1 最小版不需要先做 UDP 式 drop/reorder/late-packet handling，但仍要防守 session artifact 自己是否有接好。
 
@@ -84,34 +84,26 @@ Out of scope unless integration requires it:
 - `{session_id}.meta.jsonl` 保存最小 sidecar metadata，例如 `kind`、`sequence`、`offset`、`length`、`ts_ms`，必要時再加 events。
 - `stream_merge` 依 metadata sidecar 從 `.bin` 決定 clip byte range，再輸出 clip metadata JSONL。
 
-因此目前 baseline 的主要問題不只是少做功能，而是把 `.bin` 誤當成 JSON payload source。
-
 目前已完成：
 
-- 使用 inotify/poll 監聽 growing file 與 `.pipeline_end`。
-- 從 append-only source drain 新 bytes。
-- 以 brace-balanced framing 切出完整 JSON object。
-- 只輸出 `type=clip` records，讓下游 `log_parse --filter type=clip` 與 `clip_store` 可串接。
-- sentinel 出現後 drain final bytes 並退出。
+- 使用 inotify/poll 監聽 `.meta.jsonl` 與 `.pipeline_end`。
+- 從 sidecar drain 新 meta records。
+- 以 canonical `sequence`、`offset`、`length`、`ts_ms` 驅動 clip byte-range metadata。
+- 以 5s 時間窗輸出 complete clip。
+- `sequence` / `offset` continuity 斷裂時輸出 partial clip 並重設 state。
+- idle timeout 時輸出 partial clip。
+- sentinel 出現後 drain final meta records 並 flush final clip。
 
-這些「已完成」只描述 current baseline，不代表 target architecture 正確。
+目前明確留作 future work：
 
-目前未完成，應納入 GRA-24 或後續 v2.1 拆分：
-
-- 以 `.meta.jsonl` 驅動的時間窗切割 complete clip。
-- 以 metadata sidecar 驅動 binary `.bin` 切割，而不是從 `.bin` 解析 JSON。
-- `sequence` / `offset` continuity 檢查。
-- 最小 `Collecting -> EmitComplete -> EmitPartial -> Reset` 類 FSM。
-- gap 發生時輸出 partial clip 並重設 buffer。
-- idle timeout。
 - CRC32 校驗與重複 chunk 去重。
 - 從 meta chunks 解析 events 並和 clip metadata 合併輸出。
+- 把 `.bin` 真的切出 playable mp4 小檔。
 
 不需要在 v2.1 最小版先做：
 
 - UDP 式封包亂序重排。
 - late packet acceptance/rejection 複雜狀態。
-- 把 `.bin` 真的切出 playable mp4 小檔。
 
 v2.2 驗證應納入：
 
