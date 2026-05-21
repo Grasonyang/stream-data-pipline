@@ -7,7 +7,7 @@
  *           stdout──pipe1─▶stdin           │
  *                              stdout──pipe2─▶stdin
  *
- * See .docs/pipeline_dispatcher-v1.0.md.
+ * See .docs/applets/pipeline-dispatcher.md.
  *
  * CLI:
  *   pipeline_dispatcher <session_id> <src_dir> <db_path> <ttl_seconds>

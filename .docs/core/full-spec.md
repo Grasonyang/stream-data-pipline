@@ -177,7 +177,7 @@ repo docs 應只描述目前實作有的 error model：
 - README 的 quick demo 用來說明最小可執行路徑，不等於 final demo evidence。
 - benchmark、compatibility matrix、report-ready demo artifacts 屬於後續 v2.2 收斂。
 
-因此 `full_spec` 應說明 repo 如何工作，但不應把尚未補齊的 benchmark/man/help 說成已完成交付。
+因此 `core/full-spec` 應說明 repo 如何工作，但不應把尚未補齊的 benchmark/man/help 說成已完成交付。
 
 ## What Belongs Here
 
@@ -200,6 +200,6 @@ repo docs 應只描述目前實作有的 error model：
 如果是第一次進 repo，建議順序：
 
 1. `README.md`：先看課程主軸、build/test/demo。
-2. `.docs/compliance-matrix.md`：確認哪些要求已完成、哪些是 follow-up。
-3. `.docs/full_spec.md`：理解 repo role、pipeline 結構與內部邊界。
+2. `.docs/core/compliance-matrix.md`：確認哪些要求已完成、哪些是 follow-up。
+3. `.docs/core/full-spec.md`：理解 repo role、pipeline 結構與內部邊界。
 4. applet / library spec：進入單一模組細節。

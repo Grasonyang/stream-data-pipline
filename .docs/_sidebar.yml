@@ -3,23 +3,29 @@ sidebar:
     items:
       - title: Home
         page: Home
-      - title: Internal Spec
-        page: full_spec
+      - title: Core Docs
+        items:
+          - title: Internal Spec
+            page: core/full-spec
+          - title: Compliance Matrix
+            page: core/compliance-matrix
+          - title: v2 Gap List
+            page: core/v2-gap-list
       - title: C Entry Point
         items:
           - title: Pipeline Dispatcher
-            page: pipeline_dispatcher-v1.0
+            page: applets/pipeline-dispatcher
       - title: BusyBox Applets
         items:
           - title: Stream Merge
-            page: stream_merge-v1.0
+            page: applets/stream-merge
           - title: Log Parse
-            page: log_parse-v1.0
+            page: applets/log-parse
           - title: Clip Store
-            page: clip_store-v1.0
+            page: applets/clip-store
       - title: Shared Libraries
         items:
           - title: Lib Pipeline
-            page: libpipeline-v1.0
+            page: lib/libpipeline
           - title: Stream Logger
-            page: stream_logger-v1.0
+            page: lib/stream-logger
