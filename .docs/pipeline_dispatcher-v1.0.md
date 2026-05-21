@@ -47,10 +47,13 @@ stream_merge --src <src_dir> --session <session_id>
 - stdout 預設不輸出診斷訊息。
 - 所有診斷訊息走 stderr。
 - child exec path 要避免依賴 caller working directory，若目前尚未處理，需在實作或 wrapper 中固定搜尋路徑。
+- spawn 失敗時：`goto fail` 會先關閉所有 pipe fd，再呼叫 `kill_and_reap()` 對已成功 spawn 的 child 送 SIGTERM 並 waitpid 回收，避免 zombie。
+- `wait_all()` 會跳過 pid < 0 的 slot，確保部分 spawn 失敗時不會誤呼叫 `waitpid(-1, ...)`。
 
 ## Local Test Focus
 
 - 參數不足時回傳 `2`。
 - pipe / fork failure path 有清理已開 fd，並回傳 `-1`。
+- fork 失敗時已啟動的 child 被 SIGTERM 並 wait，不留 zombie。
 - 任一 child exit non-zero 時 dispatcher 回傳 `-2`。
 - 正常 EOF cascade 不留下 zombie process。

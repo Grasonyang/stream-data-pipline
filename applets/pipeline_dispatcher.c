@@ -23,6 +23,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,6 +87,7 @@ static int wait_all(pid_t pids[3])
 {
     int worst = 0;
     for (int i = 0; i < 3; ++i) {
+        if (pids[i] < 0) continue;
         int status = 0;
         if (waitpid(pids[i], &status, 0) < 0) {
             LOG_ERROR("waitpid(%d) failed: %s", (int)pids[i], strerror(errno));
@@ -103,6 +105,19 @@ static int wait_all(pid_t pids[3])
         }
     }
     return worst;
+}
+
+static void kill_and_reap(pid_t pids[3])
+{
+    for (int i = 0; i < 3; ++i) {
+        if (pids[i] > 0) kill(pids[i], SIGTERM);
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (pids[i] > 0) {
+            int status;
+            waitpid(pids[i], &status, 0);
+        }
+    }
 }
 
 int main(int argc, char *argv[])
@@ -165,33 +180,33 @@ int main(int argc, char *argv[])
     };
 
     int all_pipes[] = {pipe1[0], pipe1[1], pipe2[0], pipe2[1]};
+    pid_t pids[3] = {-1, -1, -1};
 
     /* stream_merge: stdout → pipe1[WRITE], stdin = /dev/null (inotify driven). */
-    pid_t merge_pid = spawn_child(
+    pids[0] = spawn_child(
         bin_stream_merge, merge_argv,
         STDIN_FILENO, pipe1[WRITE_END],
         all_pipes, 4);
-    if (merge_pid < 0) goto fail;
+    if (pids[0] < 0) goto fail;
 
     /* log_parse: stdin ← pipe1[READ], stdout → pipe2[WRITE]. */
-    pid_t parse_pid = spawn_child(
+    pids[1] = spawn_child(
         bin_log_parse, parse_argv,
         pipe1[READ_END], pipe2[WRITE_END],
         all_pipes, 4);
-    if (parse_pid < 0) goto fail;
+    if (pids[1] < 0) goto fail;
 
     /* clip_store: stdin ← pipe2[READ], stdout = inherited (debug). */
-    pid_t store_pid = spawn_child(
+    pids[2] = spawn_child(
         bin_clip_store, store_argv,
         pipe2[READ_END], STDOUT_FILENO,
         all_pipes, 4);
-    if (store_pid < 0) goto fail;
+    if (pids[2] < 0) goto fail;
 
     /* Parent closes all pipe fds — only the children should hold them. */
     close(pipe1[0]); close(pipe1[1]);
     close(pipe2[0]); close(pipe2[1]);
 
-    pid_t pids[3] = { merge_pid, parse_pid, store_pid };
     int rc = wait_all(pids);
 
     if (rc == 0) {
@@ -204,5 +219,6 @@ int main(int argc, char *argv[])
 fail:
     close(pipe1[0]); close(pipe1[1]);
     close(pipe2[0]); close(pipe2[1]);
+    kill_and_reap(pids);
     return -1;
 }

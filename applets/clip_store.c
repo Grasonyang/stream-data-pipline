@@ -166,7 +166,7 @@ static int load_latest(FILE *fp, const char *key, row_t *out, long now)
     }
     free(line);
 
-    if (!found || out->expire_at <= now) {
+    if (!found || (out->expire_at != 0 && out->expire_at <= now)) {
         return 0;
     }
     return 1;
@@ -183,7 +183,7 @@ static int append_row(FILE *fp, const char *key, const char *value, long expire_
     return fflush(fp);
 }
 
-static int rewrite_gc(FILE *fp, long now)
+static int rewrite_gc(FILE *fp, const char *db_path, long now)
 {
     row_t *rows = NULL;
     size_t len = 0;
@@ -232,25 +232,50 @@ static int rewrite_gc(FILE *fp, long now)
     }
     free(line);
 
-    if (ftruncate(fileno(fp), 0) != 0) {
+    char tmp_path[PATH_MAX];
+    if (snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", db_path) >= (int)sizeof(tmp_path)) {
+        for (size_t i = 0; i < len; ++i) { free(rows[i].key); free(rows[i].value); }
+        free(rows);
         return -1;
     }
-    if (rewind(fp), fseek(fp, 0, SEEK_SET) != 0) {
+    int tmp_fd = open(tmp_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (tmp_fd < 0) {
+        for (size_t i = 0; i < len; ++i) { free(rows[i].key); free(rows[i].value); }
+        free(rows);
+        return -1;
+    }
+    FILE *tmp_fp = fdopen(tmp_fd, "w");
+    if (tmp_fp == NULL) {
+        close(tmp_fd);
+        unlink(tmp_path);
+        for (size_t i = 0; i < len; ++i) { free(rows[i].key); free(rows[i].value); }
+        free(rows);
         return -1;
     }
     for (size_t i = 0; i < len; ++i) {
-        if (rows[i].expire_at > now && fprintf(fp, "%s\t%s\t%ld\n", rows[i].key, rows[i].value, rows[i].expire_at) < 0) {
+        if ((rows[i].expire_at == 0 || rows[i].expire_at > now) &&
+            fprintf(tmp_fp, "%s\t%s\t%ld\n", rows[i].key, rows[i].value, rows[i].expire_at) < 0) {
+            fclose(tmp_fp);
+            unlink(tmp_path);
+            for (size_t j = 0; j < len; ++j) { free(rows[j].key); free(rows[j].value); }
+            free(rows);
             return -1;
         }
     }
-    if (fflush(fp) != 0 || fsync(fileno(fp)) != 0) {
+    if (fflush(tmp_fp) != 0 || fsync(fileno(tmp_fp)) != 0) {
+        fclose(tmp_fp);
+        unlink(tmp_path);
+        for (size_t i = 0; i < len; ++i) { free(rows[i].key); free(rows[i].value); }
+        free(rows);
         return -1;
     }
-    for (size_t i = 0; i < len; ++i) {
-        free(rows[i].key);
-        free(rows[i].value);
-    }
+    fclose(tmp_fp);
+    for (size_t i = 0; i < len; ++i) { free(rows[i].key); free(rows[i].value); }
     free(rows);
+    if (rename(tmp_path, db_path) != 0) {
+        unlink(tmp_path);
+        return -1;
+    }
     return 0;
 }
 
@@ -315,7 +340,7 @@ int main(int argc, char *argv[])
         free(row.key);
         free(row.value);
     } else if (do_gc) {
-        rc = rewrite_gc(fp, now) == 0 ? 0 : 1;
+        rc = rewrite_gc(fp, db, now) == 0 ? 0 : 1;
     } else {
         char *line = NULL;
         size_t cap = 0;
@@ -335,7 +360,7 @@ int main(int argc, char *argv[])
             if (pipeline_buffer_append_str(&key, session) != 0 ||
                 pipeline_buffer_append_char(&key, ':') != 0 ||
                 pipeline_buffer_append_str(&key, ts) != 0 ||
-                append_row(fp, key.data, path, row_now + ttl) != 0) {
+                append_row(fp, key.data, path, ttl == 0 ? 0 : row_now + ttl) != 0) {
                 LOG_ERROR("write db failed: %s", strerror(errno));
                 rc = 1;
                 pipeline_buffer_free(&key);

@@ -54,10 +54,10 @@ $(BUILD_DIR)/test_stream_logger: tests/test_stream_logger.c $(LIB_OBJS) | $(BUIL
 test: $(TEST_BINS) $(BINS)
 	@for test_bin in $(TEST_BINS); do $$test_bin || exit $$?; done
 	@for test_script in $(TEST_SCRIPTS); do \
-		LOG_PARSE=$(CURDIR)/$(BUILD_DIR)/log_parse \
-		CLIP_STORE=$(CURDIR)/$(BUILD_DIR)/clip_store \
-		STREAM_MERGE=$(CURDIR)/$(BUILD_DIR)/stream_merge \
-		PIPELINE_DISPATCHER=$(CURDIR)/$(BUILD_DIR)/pipeline_dispatcher \
+		LOG_PARSE="$(CURDIR)/$(BUILD_DIR)/log_parse" \
+		CLIP_STORE="$(CURDIR)/$(BUILD_DIR)/clip_store" \
+		STREAM_MERGE="$(CURDIR)/$(BUILD_DIR)/stream_merge" \
+		PIPELINE_DISPATCHER="$(CURDIR)/$(BUILD_DIR)/pipeline_dispatcher" \
 		sh $$test_script || exit $$?; \
 	done
 

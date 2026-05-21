@@ -39,7 +39,8 @@ sess_001:1747065600	/tmp/clips/sess_001/1747065600.mp4 1747069200
 - 相同 key 再寫入採 latest-write-wins 語意；`--get` 會掃描最後一筆該 key。
 - 寫入路徑目前是 append-only；`--gc` 會重寫檔案，保留每個 key 最新且未過期的 row。
 - `expire_at` 由每次寫入當下時間加上 `--ttl` 決定。
-- 目前 `--gc` 是 in-place rewrite + `fsync()`，不是 tmp file + rename crash-safe replace。
+- `--ttl 0` 表示永不過期，寫入 `expire_at = 0` 作為 sentinel；`--get` 與 `--gc` 均以 `expire_at == 0` 判斷為有效 row，不會視為過期。
+- `--gc` 使用 tmp file + rename：先將存活 rows 寫入 `db_path.tmp`，`fsync()` 後以 `rename()` 原子取代原檔，crash 不會造成 DB 遺失。
 
 ## Optional Repo-Local Modes
 
