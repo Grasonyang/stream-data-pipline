@@ -31,7 +31,7 @@ stream_merge | log_parse --filter type=clip | clip_store
 | 提取共用邏輯為內部函式庫 | `libpipeline`、`stream_logger` |
 | 遵循 stdout/stderr 與 CLI 慣例 | applet stdout 保持資料流，diagnostic logs 走 stderr |
 
-完整對照表見 [`.docs/core/compliance-matrix.md`](.docs/core/compliance-matrix.md)。
+完整對照表見 [`.docs/core/compliance.md`](.docs/core/compliance.md)。
 
 ## Pipeline 架構
 
@@ -144,9 +144,8 @@ cat /tmp/clips.db
 |   `-- stream_logger.{h,c}     # stderr-only diagnostic logger
 |-- tests/                      # C unit tests and shell integration tests
 |-- .docs/                      # repo-local implementation and design docs
-|   |-- core/                   # project-level specs, compliance, gap planning
+|   |-- core/                   # project overview and compliance summary
 |   |-- applets/                # per-applet behavior docs
-|   `-- lib/                    # shared library docs
 `-- Makefile
 ```
 
@@ -171,10 +170,8 @@ v2 會優先補齊作業交付需要的文件、收斂與證據：
 - Repo-local docs index：[`./.docs/Home.md`](.docs/Home.md)
 - Core docs：[`./.docs/core/`](.docs/core/)
 - Applet docs：[`./.docs/applets/`](.docs/applets/)
-- Shared library docs：[`./.docs/lib/`](.docs/lib/)
-- Assignment compliance matrix：[`./.docs/core/compliance-matrix.md`](.docs/core/compliance-matrix.md)
-- v2 gap list：[`./.docs/core/v2-gap-list.md`](.docs/core/v2-gap-list.md)
-- Internal spec：[`./.docs/core/full-spec.md`](.docs/core/full-spec.md)
+- Assignment compliance summary：[`./.docs/core/compliance.md`](.docs/core/compliance.md)
+- Internal overview：[`./.docs/core/overview.md`](.docs/core/overview.md)
 - Cross-repo integration contract：Linear integration docs
 
 若 Linear integration docs 與 repo-local docs 衝突，以 Linear 作為跨 repo contract 的 source of truth；repo `.docs/` 則描述本 repo 的實作細節、測試與設計限制。

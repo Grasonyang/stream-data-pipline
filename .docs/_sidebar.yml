@@ -5,12 +5,10 @@ sidebar:
         page: Home
       - title: Core Docs
         items:
-          - title: Internal Spec
-            page: core/full-spec
-          - title: Compliance Matrix
-            page: core/compliance-matrix
-          - title: v2 Gap List
-            page: core/v2-gap-list
+          - title: Overview
+            page: core/overview
+          - title: Compliance
+            page: core/compliance
       - title: C Entry Point
         items:
           - title: Pipeline Dispatcher
@@ -23,9 +21,3 @@ sidebar:
             page: applets/log-parse
           - title: Clip Store
             page: applets/clip-store
-      - title: Shared Libraries
-        items:
-          - title: Lib Pipeline
-            page: lib/libpipeline
-          - title: Stream Logger
-            page: lib/stream-logger

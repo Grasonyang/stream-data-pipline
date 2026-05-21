@@ -8,7 +8,7 @@
  *   - dynamic byte buffer
  *   - sentinel filename detection
  *
- * See .docs/lib/libpipeline.md for the full specification.
+ * See .docs/core/overview.md for the repo-level contract.
  */
 
 #ifndef LIBPIPELINE_H
