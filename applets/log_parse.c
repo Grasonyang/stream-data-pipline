@@ -1,11 +1,3 @@
-/*
- * log_parse.c -- pipe-friendly structured log parser.
- *
- * Supports two v1 modes:
- *   - regex mode: parse raw stdin lines into fields and emit JSON/CSV
- *   - integration mode: filter JSON Lines with --filter key=value
- */
-
 #include "libpipeline.h"
 #include "stream_logger.h"
 
@@ -14,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
 
 typedef enum {
     FORMAT_JSON = 0,
@@ -38,12 +31,17 @@ typedef struct {
 
 /* CLI and line helpers. */
 
-static void usage(const char *prog) {
-    fprintf(stderr,
-        "usage: %s [--regex <pattern> --fields <f1,f2,...> --format json|csv] "
-        "[--filter key=value]\n",
-        prog
-    );
+static void print_usage(FILE *stream, const char *prog_name) {
+    fprintf(stream, "Usage: %s [OPTIONS]\n\n", prog_name);
+    fprintf(stream, "Description:\n");
+    fprintf(stream, "  A lightweight structured record processor for UNIX pipelines.\n");
+    fprintf(stream, "  Reads from stdin and writes to stdout. Diagnostic logs to stderr.\n\n");
+    fprintf(stream, "Options:\n");
+    fprintf(stream, "  -r, --regex <pattern>  Extract fields using POSIX extended regular expressions\n");
+    fprintf(stream, "  -e, --fields <f1,f2>   Comma-separated field names for regex mode\n");
+    fprintf(stream, "  -f, --filter <k=v>     Only emit JSON Lines where the key matches the value\n");
+    fprintf(stream, "      --format <fmt>     Set output format (json|csv) (default: json)\n");
+    fprintf(stream, "  -h, --help             Show this help message and exit\n");
 }
 
 static char *xstrndup(const char *src, size_t len) {
@@ -376,34 +374,57 @@ static int process_json_line(const char *line, const filter_t *filter)
     return 0;
 }
 
+
 int main(int argc, char *argv[]) {
     stream_logger_set_tag("log_parse");
 
     char *regex_pattern = NULL;
     char *fields_arg = NULL;
     char *format_arg = NULL;
+    char *filter_kv = NULL;
     filter_t filter = {0};
     output_format_t format = FORMAT_JSON;
     regex_state_t regex_state = {0};
     int regex_mode = 0;
     int regex_ready = 0;
     int exit_code = 0;
+    
+    int opt;
+    static struct option long_options[] = {
+        {"regex",  required_argument, 0, 'r'},
+        {"fields", required_argument, 0, 'e'},
+        {"filter", required_argument, 0, 'f'},
+        {"format", required_argument, 0, 1000},
+        {"help",   no_argument,       0, 'h'},
+        {0, 0, 0, 0}
+    };
 
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--regex") == 0 && i + 1 < argc) {
-            regex_pattern = argv[++i];
-        } else if (strcmp(argv[i], "--fields") == 0 && i + 1 < argc) {
-            fields_arg = argv[++i];
-        } else if (strcmp(argv[i], "--format") == 0 && i + 1 < argc) {
-            format_arg = argv[++i];
-        } else if (strcmp(argv[i], "--filter") == 0 && i + 1 < argc) {
-            if (parse_filter(argv[++i], &filter) != 0) {
-                LOG_ERROR("invalid filter syntax; expected key=value");
-                return 1;
-            }
-        } else {
-            usage(argv[0]);
-            return 1;
+    while ((opt = getopt_long(argc, argv, "r:e:f:h", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'r':
+                regex_pattern = optarg;
+                break;
+            case 'e':
+                fields_arg = optarg;
+                break;
+            case 'f':
+                filter_kv = optarg;
+                if (parse_filter(filter_kv, &filter) != 0) {
+                    LOG_ERROR("invalid filter syntax; expected key=value");
+                    return 1;
+                }
+                break;
+            case 1000: // --format
+                format_arg = optarg;
+                break;
+            case 'h':
+                print_usage(stdout, argv[0]);
+                exit(EXIT_SUCCESS);
+            case '?':
+                print_usage(stderr, argv[0]);
+                exit(EXIT_FAILURE);
+            default:
+                exit(EXIT_FAILURE);
         }
     }
 
