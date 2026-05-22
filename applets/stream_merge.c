@@ -28,7 +28,6 @@
 #include <string.h>
 #include <sys/inotify.h>
 #include <unistd.h>
-#include <getopt.h>
 
 #define DEFAULT_CLIP_MS  5000
 #define DEFAULT_IDLE_MS  2000
@@ -309,13 +308,13 @@ static int check_idle(clip_state_t *s, int64_t idle_ms,
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
-/*static void usage(const char *prog)
+static void usage(const char *prog)
 {
     fprintf(stderr,
             "usage: %s --src <src_dir> --session <session_id>"
             " [--clip-secs <n>] [--idle-secs <n>]\n",
             prog);
-}*/
+}
 
 static int path_join(char *out, size_t sz, const char *dir, const char *name)
 {
@@ -351,62 +350,33 @@ static void consume_inotify(int fd, int *saw_sentinel)
         }
     }
 }
-static void print_usage(FILE *stream, const char *prog_name) {
-    fprintf(stream, "Usage: %s [OPTIONS] <session_id> <src_dir>\n\n", prog_name);
-    fprintf(stream, "Description:\n");
-    fprintf(stream, "  Synchronizes and merges a growing binary stream with its metadata sidecar.\n");
-    fprintf(stream, "  Extracts structured byte ranges and emits valid JSON Lines to stdout.\n\n");
-    fprintf(stream, "Options:\n");
-    fprintf(stream, "      --clip-secs <n>    Target clip duration in seconds (default: 5.0)\n");
-    fprintf(stream, "      --idle-secs <n>    Idle timeout before emitting partial clip (default: 2.0)\n");
-    fprintf(stream, "  -h, --help             Show this help message and exit\n");
-}
+
 /* ── main ────────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
 {
     stream_logger_set_tag("stream_merge");
 
-   // const char *src      = NULL;
-    //const char *session  = NULL;
+    const char *src      = NULL;
+    const char *session  = NULL;
     int64_t clip_ms      = DEFAULT_CLIP_MS;
     int64_t idle_ms      = DEFAULT_IDLE_MS;
 
-    int opt;
-    static struct option long_options[] = {
-        {"clip-secs", required_argument, 0, 1000},
-        {"idle-secs", required_argument, 0, 1001},
-        {"help",      no_argument,       0, 'h'},
-        {0, 0, 0, 0}
-    };
-    
-    while ((opt = getopt_long(argc, argv, "h", long_options, NULL)) != -1) {
-        switch (opt) {
-            case 1000: // --clip-secs
-                clip_ms = (int64_t)(atof(optarg) * 1000.0);
-                break;
-            case 1001: // --idle-secs
-                idle_ms = (int64_t)(atof(optarg) * 1000.0);
-                break;
-            case 'h':
-                print_usage(stdout, argv[0]);
-                exit(EXIT_SUCCESS);
-            case '?':
-                print_usage(stderr, argv[0]);
-                exit(EXIT_FAILURE);
-            default:
-                exit(EXIT_FAILURE);
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--src") == 0 && i + 1 < argc) {
+            src = argv[++i];
+        } else if (strcmp(argv[i], "--session") == 0 && i + 1 < argc) {
+            session = argv[++i];
+        } else if (strcmp(argv[i], "--clip-secs") == 0 && i + 1 < argc) {
+            clip_ms = (int64_t)(atof(argv[++i]) * 1000.0);
+        } else if (strcmp(argv[i], "--idle-secs") == 0 && i + 1 < argc) {
+            idle_ms = (int64_t)(atof(argv[++i]) * 1000.0);
+        } else {
+            usage(argv[0]);
+            return 1;
         }
     }
-
-   if (optind + 2 > argc) {
-        fprintf(stderr, "Error: Missing required arguments <session_id> and/or <src_dir>\n\n");
-        print_usage(stderr, argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    const char *session = argv[optind];
-    const char *src     = argv[optind + 1];
+    if (!src || !session) { usage(argv[0]); return 1; }
 
     /* open .bin (verify existence; not read in v2.1) */
     char bin_path[PATH_MAX], meta_path[PATH_MAX];

@@ -1,4 +1,6 @@
-
+/*
+ * clip_store.c -- plain-text clip index persistence applet.
+ */
 
 #include "libpipeline.h"
 #include "stream_logger.h"
@@ -13,8 +15,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <getopt.h>
-#include <stdbool.h>
 
 typedef struct {
     char *key;
@@ -22,17 +22,9 @@ typedef struct {
     long expire_at;
 } row_t;
 
-static void print_usage(FILE *stream, const char *prog_name) {
-    fprintf(stream, "Usage: %s [OPTIONS]\n\n", prog_name);
-    fprintf(stream, "Description:\n");
-    fprintf(stream, "  Plain-text clip index persistence applet for UNIX pipelines.\n");
-    fprintf(stream, "  Reads JSONL from stdin and appends to the specified database file.\n\n");
-    fprintf(stream, "Options:\n");
-    fprintf(stream, "  -d, --db <path>        Path to the database file (Required)\n");
-    fprintf(stream, "  -t, --ttl <seconds>    Time-To-Live for stored clips (default: 3600)\n");
-    fprintf(stream, "      --get <key>        Retrieve the latest value for a specific key\n");
-    fprintf(stream, "      --gc               Run standalone Garbage Collection and exit\n");
-    fprintf(stream, "  -h, --help             Show this help message and exit\n");
+static void usage(const char *prog)
+{
+    fprintf(stderr, "usage: %s --db <db_path> [--ttl <seconds>] [--get <key>|--gc]\n", prog);
 }
 
 static char *json_find_string_value(const char *line, const char *key)
@@ -295,49 +287,22 @@ int main(int argc, char *argv[])
     const char *ttl_arg = "3600";
     const char *get_key = NULL;
     int do_gc = 0;
-
-    int opt;
-    static struct option long_options[] = {
-        {"db",   required_argument, 0, 'd'},
-        {"ttl",  required_argument, 0, 't'},
-        {"get",  required_argument, 0, 1000},
-        {"gc",   no_argument,       0, 1001},
-        {"help", no_argument,       0, 'h'},
-        {0, 0, 0, 0}
-    };
-
-    while ((opt = getopt_long(argc, argv, "d:t:h", long_options, NULL)) != -1) {
-        switch (opt) {
-            case 'd':
-                db = optarg;
-                break;
-            case 't':
-                ttl_arg = optarg;
-                break;
-            case 1000: // --get
-                get_key = optarg;
-                break;
-            case 1001: // --gc
-                do_gc = 1;
-                break;
-            case 'h':
-                print_usage(stdout, argv[0]);
-                exit(EXIT_SUCCESS);
-            case '?':
-                print_usage(stderr, argv[0]);
-                exit(EXIT_FAILURE);
-            default:
-                exit(EXIT_FAILURE);
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--db") == 0 && i + 1 < argc) {
+            db = argv[++i];
+        } else if (strcmp(argv[i], "--ttl") == 0 && i + 1 < argc) {
+            ttl_arg = argv[++i];
+        } else if (strcmp(argv[i], "--get") == 0 && i + 1 < argc) {
+            get_key = argv[++i];
+        } else if (strcmp(argv[i], "--gc") == 0) {
+            do_gc = 1;
+        } else {
+            usage(argv[0]);
+            return 1;
         }
     }
-
-    if (db == NULL && optind < argc) {
-        db = argv[optind];
-    }
-
     if (db == NULL) {
-        fprintf(stderr, "Error: --db <path> is required.\n\n");
-        print_usage(stderr, argv[0]);
+        usage(argv[0]);
         return 1;
     }
 
