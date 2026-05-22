@@ -122,7 +122,7 @@ mkdir -p /tmp/stream/demo
 ./build/pipeline_dispatcher demo /tmp/stream/demo /tmp/clips.db 300 &
 pid=$!
 printf '\x00\x01\x02\x03' >> /tmp/stream/demo/demo.bin
-printf '%s\n' '{"kind":"data","sequence":1,"offset":0,"length":4,"ts_ms":1000}' >> /tmp/stream/demo/demo.meta.jsonl
+printf '%s\n' '{"kind":"data","seq":1,"offset":0,"length":4,"ts_ms":1000}' >> /tmp/stream/demo/demo.meta.jsonl
 touch /tmp/stream/demo/.pipeline_end
 wait "$pid"
 cat /tmp/clips.db
