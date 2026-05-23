@@ -54,8 +54,8 @@ Use \fB0\fR to store records that never expire.
 .BI \-\-get " key"
 Retrieve the latest live (non-expired) value for \fIkey\fR and print it to
 stdout.
-Exits with status 1 if the key is not found or all matching records are
-expired.
+Exits with status 0 whether or not a value is found; produces no output when
+the key is absent or all matching records are expired.
 .TP
 .B \-\-gc
 Run garbage collection: rewrite the database to a temporary file keeping only
@@ -71,8 +71,7 @@ Print a usage summary to stdout and exit with status 0.
 Operation completed successfully.
 .TP
 .B 1
-An error occurred: missing \fB\-\-db\fR argument, I/O error, or key not found
-(for \fB\-\-get\fR).
+An error occurred: missing \fB\-\-db\fR argument, or I/O error.
 .SH EXAMPLES
 .PP
 Append clip records from stdin with a one-hour TTL:

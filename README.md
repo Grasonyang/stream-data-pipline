@@ -181,6 +181,7 @@ v2 會優先補齊作業交付需要的文件、收斂與證據：
 - Assignment compliance summary：[`./.docs/core/compliance.md`](.docs/core/compliance.md)
 - Internal overview：[`./.docs/core/overview.md`](.docs/core/overview.md)
 - Man pages：[`man/stream_merge.1`](man/stream_merge.1)、[`man/log_parse.1`](man/log_parse.1)、[`man/clip_store.1`](man/clip_store.1)
+- Toybox / GNU 相容性矩陣：[`.docs/core/compatibility.md`](.docs/core/compatibility.md)
 - Cross-repo integration contract：Linear integration docs
 
 若 Linear integration docs 與 repo-local docs 衝突，以 Linear 作為跨 repo contract 的 source of truth；repo `.docs/` 則描述本 repo 的實作細節、測試與設計限制。
