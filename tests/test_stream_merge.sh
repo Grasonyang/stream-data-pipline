@@ -35,8 +35,8 @@ check_contains() {
 : >"$META"
 
 # Use --clip-secs 5 --idle-secs 10 (long idle so the 5s window fires first).
-"$STREAM_MERGE" --src "$TMP_DIR" --session "$SESSION" \
-    --clip-secs 5 --idle-secs 10 \
+"$STREAM_MERGE" --clip-secs 5 --idle-secs 10 \
+    "$SESSION" "$TMP_DIR" \
     >"$TMP_DIR/out1" 2>"$TMP_DIR/err1" &
 pid=$!
 sleep 0.05
@@ -76,8 +76,8 @@ META2="$TMP_DIR/$SESSION2.meta.jsonl"
 : >"$BIN2"
 : >"$META2"
 
-"$STREAM_MERGE" --src "$TMP_DIR" --session "$SESSION2" \
-    --clip-secs 30 --idle-secs 10 \
+"$STREAM_MERGE" --clip-secs 30 --idle-secs 10 \
+    "$SESSION2" "$TMP_DIR" \
     >"$TMP_DIR/out2" 2>"$TMP_DIR/err2" &
 pid2=$!
 sleep 0.05
@@ -111,8 +111,8 @@ META3="$TMP_DIR/$SESSION3.meta.jsonl"
 : >"$BIN3"
 : >"$META3"
 
-"$STREAM_MERGE" --src "$TMP_DIR" --session "$SESSION3" \
-    --clip-secs 5 --idle-secs 10 \
+"$STREAM_MERGE" --clip-secs 5 --idle-secs 10 \
+    "$SESSION3" "$TMP_DIR" \
     >"$TMP_DIR/out3" 2>"$TMP_DIR/err3" &
 pid3=$!
 sleep 0.05
