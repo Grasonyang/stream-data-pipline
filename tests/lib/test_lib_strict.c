@@ -82,6 +82,7 @@ static void test_jsonl_codec_strict(void)
     CHECK(jsonl_get_string("{\"kind\":12}", "kind", out, sizeof(out)) == -1);
     CHECK(jsonl_get_string("[\"not-object\"]", "kind", out, sizeof(out)) == -1);
     CHECK(jsonl_get_string("{\"Kind\":\"data\"}", "kind", out, sizeof(out)) == -1);
+    CHECK(jsonl_get_string("{\"kind\":\"data\"}junk", "kind", out, sizeof(out)) == -1);
 
     CHECK(jsonl_get_int64("{\"n\":-42}", "n", &i64) == 0);
     CHECK(i64 == -42);
@@ -100,6 +101,9 @@ static void test_jsonl_codec_strict(void)
     CHECK(jsonl_get_bool("{\"ok\":false}", "ok", &b) == 0);
     CHECK(b == 0);
     CHECK(jsonl_get_bool("{\"ok\":1}", "ok", &b) == -1);
+    CHECK(jsonl_is_object("{\"type\":\"clip\"}") == 1);
+    CHECK(jsonl_is_object("{\"type\":\"clip\"}junk") == 0);
+    CHECK(jsonl_is_object("{\"type\":\"clip\"}   \t") == 1);
 
     dynamic_buffer_t buf = {0};
     CHECK(jsonl_write_string(&buf, "a\"b\\c\n\t\b\f") == 0);

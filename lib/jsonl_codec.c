@@ -2,6 +2,7 @@
 
 #include "cJSON.h"
 
+#include <ctype.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -16,8 +17,16 @@ static cJSON *parse_object(const char *line) {
         return NULL;
     }
 
-    cJSON *root = cJSON_Parse(line);
+    const char *parse_end = NULL;
+    cJSON *root = cJSON_ParseWithOpts(line, &parse_end, 0);
     if (root == NULL || !cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return NULL;
+    }
+    while (parse_end != NULL && *parse_end != '\0' && isspace((unsigned char)*parse_end)) {
+        ++parse_end;
+    }
+    if (parse_end == NULL || *parse_end != '\0') {
         cJSON_Delete(root);
         return NULL;
     }
