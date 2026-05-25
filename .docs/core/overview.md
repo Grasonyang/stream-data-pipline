@@ -1,8 +1,8 @@
-# Core Overview
+# 核心總覽
 
 `ws_pipeline_dispatcher` 是 C / UNIX pipeline repo。它不接 WebSocket，也不解析 ESP32 packet。
 
-## Input Layout
+## 輸入 Layout
 
 ```text
 /tmp/stream/{session_id}/
@@ -24,22 +24,21 @@ pipeline_dispatcher
   -> clip_store
 ```
 
-## Responsibilities
+## 職責
 
-- `pipeline_dispatcher`：fork、pipe、exec、waitpid。
-- `stream_merge`：讀 sidecar，做時間窗與 continuity 檢查，輸出 clip metadata。
+- `pipeline_dispatcher`：驗證 session artifact、解析 CLI options、fork、pipe、exec、waitpid、signal cleanup。
+- `stream_merge`：讀 sidecar，做時間窗與 gap-aware continuity 檢查，輸出 clip metadata。
 - `log_parse`：解析 structured logs，或過濾 JSONL records。
-- `clip_store`：寫入純文字 clip index，支援 TTL/GC。
+- `clip_store`：寫入純文字 clip index，支援 TTL、查詢、GC/compact。
 
 ## Non-Goals
 
 - WebSocket server。
 - ESP32 packet parser。
-- UDP reorder / late packet handling。
-- 真正切出 playable mp4 clip。
-- benchmark、final report evidence、compatibility matrix。
+- UDP/RTP socket server（只用 demo scripts 展示 contract）。
+- 真正切出 playable MP4/MP3 clip。
 
-## Current Future Work
+## 後續工作
 
-- `GRA-30`：上層 `edge-ws-host` artifact contract 對齊。
-- `GRA-26` / `GRA-27` / `GRA-28` / `GRA-29`：final evidence、demo、benchmark、compatibility。
+- demo evidence 與 final report 整理。
+- 若需要正式 media output，新增 downstream `clip_extract` / `clip_mux`，不要塞進 `stream_merge` 或 `pipeline_dispatcher`。

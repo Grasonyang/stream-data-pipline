@@ -61,7 +61,7 @@ ESP32 Video Data
 建立三段 UNIX pipeline，不直接處理 clip JSON：
 
 ```text
-pipeline_dispatcher <session_id> <src_dir> <db_path> <ttl_seconds>
+pipeline_dispatcher [OPTIONS] <session_id> <src_dir> <db_path>
 ```
 
 ### `stream_merge`
@@ -94,7 +94,7 @@ pipeline 終端的 file-backed index。從 stdin 讀取 clip JSON Lines，用 `s
 ## 編譯與測試
 
 ```bash
-make              # 編譯所有 applet 到 build/
+make              # 編譯所有 applet 到 .build/
 make test         # 執行 C unit tests 與 applet shell tests
 make smoke        # 執行 end-to-end smoke test
 make install-man  # 安裝 man pages 到 /usr/local/share/man/man1（可用 MANDIR= 覆蓋）
@@ -123,10 +123,10 @@ rm -rf /tmp/stream/demo /tmp/clips.db
 mkdir -p /tmp/stream/demo
 : > /tmp/stream/demo/demo.bin
 : > /tmp/stream/demo/demo.meta.jsonl
-./build/pipeline_dispatcher demo /tmp/stream/demo /tmp/clips.db 300 &
+./.build/pipeline_dispatcher --ttl 300 demo /tmp/stream/demo /tmp/clips.db &
 pid=$!
 printf '\x00\x01\x02\x03' >> /tmp/stream/demo/demo.bin
-printf '%s\n' '{"kind":"data","seq":1,"offset":0,"length":4,"ts_ms":1000}' >> /tmp/stream/demo/demo.meta.jsonl
+printf '%s\n' '{"kind":"data","sequence":1,"offset":0,"length":4,"ts_ms":1000}' >> /tmp/stream/demo/demo.meta.jsonl
 touch /tmp/stream/demo/.pipeline_end
 wait "$pid"
 cat /tmp/clips.db
@@ -168,10 +168,10 @@ cat /tmp/udp_demo/clips.db
 ```text
 .
 |-- applets/
-|   |-- pipeline_dispatcher.c   # fork + pipe + exec orchestration
-|   |-- stream_merge.c          # sidecar-driven clip metadata emitter
-|   |-- log_parse.c             # regex parser, JSON/CSV formatter, record filter
-|   `-- clip_store.c            # file-backed clip index
+|   |-- pipeline_dispatcher/    # fork + pipe + exec orchestration
+|   |-- stream_merge/           # sidecar-driven clip metadata emitter
+|   |-- log_parse/              # regex parser, JSON/CSV formatter, record filter
+|   `-- clip_store/             # file-backed clip index
 |-- lib/
 |   |-- libpipeline.{h,c}       # inotify, monotonic time, buffer, sentinel helpers
 |   `-- stream_logger.{h,c}     # stderr-only diagnostic logger
@@ -190,7 +190,7 @@ cat /tmp/udp_demo/clips.db
 
 目前 repo 已完成可測試的 pipeline baseline：
 
-- `pipeline_dispatcher` 可建立 `stream_merge -> log_parse -> clip_store` process pipeline。
+- `pipeline_dispatcher` 可驗證 session artifact、解析 CLI options，並建立 `stream_merge -> log_parse -> clip_store` process pipeline。
 - `stream_merge` 可讀取 `.meta.jsonl` sidecar、驗證 session `.bin` 存在、做時間窗與 continuity 檢查，並輸出 clip byte-range metadata JSON Lines；CRC、events merge 與實體 mp4 clip extraction 留作 future work。
 - `log_parse` 可做 regex parsing、JSON/CSV output 與 JSONL filter。
 - `clip_store` 可寫入 file-backed index，並支援查詢、TTL、GC。

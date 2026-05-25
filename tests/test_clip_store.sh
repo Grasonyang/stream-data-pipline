@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-CLIP_STORE=${CLIP_STORE:-./build/clip_store}
+CLIP_STORE=${CLIP_STORE:-./.build/clip_store}
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 DB="$TMP_DIR/clips.db"

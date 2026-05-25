@@ -1,4 +1,4 @@
-# ws_pipeline_dispatcher Docs
+# ws_pipeline_dispatcher 文件
 
 這裡只放 repo 內部文件。跨 repo contract 以 Linear integration docs 為準。
 

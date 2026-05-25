@@ -39,7 +39,7 @@ MB_SIZE=$(awk "BEGIN {printf \"%.2f\", $FILE_SIZE/1048576}")
 echo "Processing $MB_SIZE MB of binary stream..."
 
 START=$(date +%s.%N)
-/usr/bin/time -v ./build/stream_merge bench_medium test_env > test_env/output.jsonl 2>test_env/bench.log
+/usr/bin/time -v ./.build/stream_merge bench_medium test_env > test_env/output.jsonl 2>test_env/bench.log
 END=$(date +%s.%N)
 LATENCY=$(awk "BEGIN {printf \"%.3f\", $END - $START}")
 
@@ -66,7 +66,7 @@ JSONL_MB=$(awk "BEGIN {printf \"%.2f\", $JSONL_SIZE/1048576}")
 echo "JSONL input: $JSONL_MB MB (50,000 records, 10,000 type=clip)"
 
 START=$(date +%s.%N)
-./build/log_parse --filter type=clip < "$JSONL_FILE" > test_env/lp_out.jsonl || true
+./.build/log_parse --filter type=clip < "$JSONL_FILE" > test_env/lp_out.jsonl || true
 END=$(date +%s.%N)
 LP_TIME=$(awk "BEGIN {printf \"%.4f\", $END - $START}")
 LP_TP=$(awk "BEGIN {printf \"%.2f\", $JSONL_MB / $LP_TIME}")
@@ -111,7 +111,7 @@ DB_PATH=test_env/clips_e2e.db
 echo "Processing $MB_SIZE MB through full pipeline (stream_merge | log_parse | clip_store)..."
 
 START=$(date +%s.%N)
-/usr/bin/time -v ./build/pipeline_dispatcher bench_medium test_env "$DB_PATH" 0 \
+/usr/bin/time -v ./.build/pipeline_dispatcher --ttl 0 bench_medium test_env "$DB_PATH" \
     2>test_env/e2e.log
 END=$(date +%s.%N)
 E2E_TIME=$(awk "BEGIN {printf \"%.3f\", $END - $START}")

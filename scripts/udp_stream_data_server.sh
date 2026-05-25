@@ -6,7 +6,7 @@ PORT=${PORT:-19000}
 ROOT_DIR=${ROOT_DIR:-/tmp/udp_stream_data}
 DB_PATH=${DB_PATH:-$ROOT_DIR/clips.db}
 CLIP_TTL=${CLIP_TTL:-300}
-PIPELINE_DISPATCHER=${PIPELINE_DISPATCHER:-$(pwd)/build/pipeline_dispatcher}
+PIPELINE_DISPATCHER=${PIPELINE_DISPATCHER:-$(pwd)/.build/pipeline_dispatcher}
 
 usage() {
     cat <<EOF
@@ -114,7 +114,7 @@ def start_session(session_id: str):
     bin_fp = open(bin_path, "ab", buffering=0)
     meta_fp = open(meta_path, "a", encoding="utf-8")
     proc = subprocess.Popen(
-        [PIPELINE_DISPATCHER, session_id, str(session_dir), DB_PATH, CLIP_TTL],
+        [PIPELINE_DISPATCHER, "--ttl", CLIP_TTL, session_id, str(session_dir), DB_PATH],
         stdout=subprocess.DEVNULL,
     )
     log(f"started session={session_id} dispatcher_pid={proc.pid}")

@@ -1,4 +1,4 @@
-.TH STREAM_MERGE 1 "May 2026" "ws_pipeline_dispatcher v2.1" "User Commands"
+.TH STREAM_MERGE 1 "May 2026" "ws_pipeline_dispatcher v2.3" "User Commands"
 .SH NAME
 stream_merge \- synchronize a growing binary stream with its metadata sidecar and emit clip JSON Lines
 .SH SYNOPSIS
@@ -10,8 +10,8 @@ stream_merge \- synchronize a growing binary stream with its metadata sidecar an
 into time-bounded clips.
 It emits one JSON Line per clip to stdout.
 .PP
-The binary data file (\fIsession_id\fB.bin\fR) is opened to verify existence;
-byte-level extraction is not performed in v2.1.
+The binary data file (\fIsession_id\fB.bin\fR) is opened to verify existence.
+stream_merge emits byte-range metadata and does not create standalone media files.
 Processing ends when a \fB.pipeline_end\fR sentinel file appears in
 \fIsrc_dir\fR, after which any remaining metadata is drained and the final
 clip is flushed.

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-STREAM_MERGE=${STREAM_MERGE:-./build/stream_merge}
+STREAM_MERGE=${STREAM_MERGE:-./.build/stream_merge}
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 SESSION=sess_stream

@@ -94,7 +94,7 @@ inotifywait -m -e modify "$src_dir/$session.meta.jsonl" \
 
 | 工具 | 指令 | Throughput | 匹配行數 | 備註 |
 | --- | --- | --- | --- | --- |
-| `log_parse` | `./build/log_parse --filter type=clip` | **25.03 MB/s** | 10,000 | 語意正確 |
+| `log_parse` | `./.build/log_parse --filter type=clip` | **25.03 MB/s** | 10,000 | 語意正確 |
 | `jq` 1.6 | `jq -c 'select(.type == "clip")'` | **14.98 MB/s** | 10,000 | 語意等同（主要比較對象） |
 | `grep` (GNU 3.7) | `grep '"type":"clip"'` | **67.50 MB/s** | 10,000 | **僅供參考，語意不等同** |
 | **比率（主）** | log_parse / jq | **167.1%** | — | log_parse 顯著優於 jq |
@@ -141,7 +141,7 @@ stream_merge bench_medium test_env
 ### 說明
 
 * 端到端吞吐量（147.95 MB/s）高於 stream_merge 獨立基準（130.64 MB/s），原因是 pipeline 各 stage 透過 pipe 並發執行，隱藏了 log_parse 與 clip_store 的處理時間。
-* 200 個 clips 全數寫入 KV 資料庫，可透過 `./build/clip_store --db test_env/clips_e2e.db --get bench_medium:<ts>` 查詢。
+* 200 個 clips 全數寫入 KV 資料庫，可透過 `./.build/clip_store --db test_env/clips_e2e.db --get bench_medium:<ts>` 查詢。
 * 記憶體峰值仍維持在 2.5 MB 以下，三個 child processes 均採用 streaming 模型。
 
 ### clip_store 與 GNU 工具的比較限制

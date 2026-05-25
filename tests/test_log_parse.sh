@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-LOG_PARSE=${LOG_PARSE:-./build/log_parse}
+LOG_PARSE=${LOG_PARSE:-./.build/log_parse}
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 

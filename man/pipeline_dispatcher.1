@@ -1,0 +1,73 @@
+.TH PIPELINE_DISPATCHER 1 "May 2026" "ws_pipeline_dispatcher v2.3" "User Commands"
+.SH NAME
+pipeline_dispatcher \- build and supervise the stream data applet pipeline
+.SH SYNOPSIS
+.B pipeline_dispatcher
+[IOPTIONSR] Isession_idR Isrc_dirR Idb_pathR
+.SH DESCRIPTION
+Bpipeline_dispatcherR validates one file-backed session and starts the
+three-stage UNIX pipeline:
+.PP
+.RS
+.nf
+stream_merge | log_parse --filter type=clip | clip_store
+.fi
+.RE
+.PP
+It is a process orchestrator. It does not receive UDP/RTP packets, parse media
+payloads, or convert B.binR data into MP4/MP3 files.
+.SH OPTIONS
+.TP
+.BI \\-ttl " seconds"
+TTL passed to Bclip_storeR. Default: B300R.
+.TP
+.BI \\-clip\-secs " n"
+Clip window passed to Bstream_mergeR. Default: B5R.
+.TP
+.BI \\-idle\-secs " n"
+Idle timeout passed to Bstream_mergeR. Default: B2R.
+.TP
+.BI \\-filter " expr"
+Filter expression passed to Blog_parseR. Default: Btype=clipR.
+.TP
+.BR \-h ", " \\-help
+Print a usage summary and exit.
+.SH ARGUMENTS
+.TP
+.I session_id
+Session identifier. The dispatcher expects Isrc_dir/session_id.binR and
+Isrc_dir/session_id.meta.jsonlR to exist or become available according to
+the stream_merge contract.
+.TP
+.I src_dir
+Directory containing the session artifacts.
+.TP
+.I db_path
+Path to the clip_store file-backed database.
+.SH EXIT STATUS
+.TP
+.B 0
+All children exited successfully.
+.TP
+.B 1
+Setup or validation failure.
+.TP
+.B 2
+Invalid command-line arguments.
+.TP
+.B 3
+At least one child exited non-zero or was killed by a signal.
+.TP
+.B 130
+Interrupted by SIGINT or SIGTERM after child cleanup.
+.SH EXAMPLES
+.PP
+.RS
+.nf
+pipeline_dispatcher --ttl 300 --clip-secs 5 demo /tmp/stream/demo /tmp/clips.db
+.fi
+.RE
+.SH SEE ALSO
+.BR stream_merge (1),
+.BR log_parse (1),
+.BR clip_store (1)

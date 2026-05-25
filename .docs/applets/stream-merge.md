@@ -1,14 +1,14 @@
 # stream_merge
 
-Reads session sidecar metadata, manages time/continuity state via a Finite State Machine (FSM), and emits clip JSON Lines.
+`stream_merge` 讀取 session 的 sidecar metadata，透過 FSM 管理時間窗與連續性狀態，並輸出 clip JSON Lines。
 
-## Architecture
+## 架構定位
 
-`stream_merge` is the source transformer in the pipeline. It reads append-only files written by an upstream network ingestor (e.g., an RTP receiver) and converts physical file updates into a stream of logical `clip` metadata events on `stdout`.
+`stream_merge` 是 pipeline 的 source transformer。它讀取上游 ingestor 寫出的 append-only 檔案，將 filesystem updates 轉換成 stdout 上的 `clip` metadata stream。
 
-It is **strictly file-based** and handles no network sockets. It relies on `inotify` and `poll`.
+它是嚴格的 file-based applet，不處理 socket，也不接 RTP/UDP。檔案事件由 `inotify` + `poll` 驅動。
 
-## Input
+## 輸入
 
 ```text
 {src_dir}/{session_id}.bin
@@ -16,19 +16,19 @@ It is **strictly file-based** and handles no network sockets. It relies on `inot
 {src_dir}/.pipeline_end
 ```
 
-## Upstream Handoff Contract
+## 上游交接 Contract
 
-`stream_merge` connects to the upstream ingestor through the filesystem, not through a socket or direct API call.
+`stream_merge` 透過 filesystem 與上游 ingestor 串接，不透過 direct function call 或 socket API。
 
-The upstream ingestor, such as an RTP/UDP receiver, must do exactly three things for each session:
+上游 ingestor（例如 RTP/UDP receiver demo）對每個 session 必須做三件事：
 
-1.  Append payload bytes to `{session_id}.bin`.
-2.  Append one metadata row to `{session_id}.meta.jsonl` for each payload chunk.
-3.  Create `.pipeline_end` after the session is complete.
+1. append payload bytes 到 `{session_id}.bin`。
+2. 每個 payload chunk append 一行 metadata 到 `{session_id}.meta.jsonl`。
+3. session 結束後建立 `.pipeline_end`。
 
-The metadata row is the synchronization contract between upstream and `stream_merge`. `offset` and `length` point into the large session-level `.bin`; `sequence` and `ts_ms` let `stream_merge` decide clip boundaries.
+metadata row 是上游與 `stream_merge` 的同步 contract。`offset` / `length` 指向大型 session-level `.bin` 內的 byte range；`sequence` / `ts_ms` 讓 `stream_merge` 判斷 clip 邊界。
 
-Example upstream write order:
+安全寫入順序：
 
 ```text
 append 4096 bytes to sess.bin
@@ -40,74 +40,76 @@ append {"kind":"data","sequence":2,"offset":4096,"length":4096,"ts_ms":2000}\n t
 touch .pipeline_end
 ```
 
-`stream_merge` watches the directory and sidecar file with `inotify`, drains new metadata lines, and emits clip JSON Lines to stdout. The upstream does not need to call `stream_merge` functions directly.
+建議規則：先寫 `.bin` payload，再寫對應 metadata row。這能保證 `stream_merge` 看到 metadata 時，被引用的 byte range 已存在。
 
-Recommended safety rule: write payload bytes to `.bin` before appending the matching metadata row. This guarantees that when `stream_merge` observes the metadata row, the referenced byte range already exists.
+## Metadata 格式
 
-The upstream ingestor must write `meta_record` lines to `.meta.jsonl`.
-Format:
 ```json
 {"kind":"data","sequence":1,"offset":0,"length":4096,"ts_ms":1747065600000,"events":["motion"]}
 ```
-*   `sequence`: Monotonically increasing chunk identifier.
-*   `offset` / `length`: Byte range inside the session-level `.bin` buffer.
-*   `ts_ms`: Source timestamp in milliseconds.
-*   `events`: Optional future array of event strings to aggregate into the emitted clip.
 
-## Output
+- `sequence`：單調遞增 chunk id，可跳號，但不可回頭。
+- `offset` / `length`：session-level `.bin` 內的 byte range。
+- `ts_ms`：來源端 timestamp，單位 milliseconds。
+- `events`：未來可選欄位；目前暫不解析 nested array。
 
-Emits single-line JSON records to `stdout` representing a clip byte-range.
+## 輸出
+
+`stream_merge` 對 stdout 輸出單行 JSON record，代表一段 clip byte range：
 
 ```json
 {"type":"clip","session_id":"sess","ts":1747065600,"path":"/tmp/stream/sess/sess_1747065600.bin","offset":0,"length":4096,"complete":true}
 ```
 
-`stream_merge` does not physically create a new media file. The output record is a pointer into the original session-level `.bin` file. Downstream tools can use `path`, `offset`, and `length` to extract or mux the byte range on demand.
+`stream_merge` 不產生新的 media file。輸出 record 是指向原始 session-level `.bin` 的 metadata pointer；下游可依 `path`、`offset`、`length` 做 on-demand extraction 或 mux。
 
-## Downstream Media Handling
+## 下游 Media Handling
 
-The aggregated `.bin` range is intentionally not converted by `stream_merge`. Media extraction is a separate downstream concern.
+聚合後的 `.bin` range 不在 `stream_merge` 內轉檔。media extraction 是 downstream concern。
 
-Recommended follow-up stages:
+建議後續 stage：
 
-*   `clip_store`: Stores the clip JSON record using a stable key such as `session_id:ts`.
-*   `clip_extract` or `clip_mux`: Reads a stored clip record, extracts the byte range from `.bin`, and writes a standalone artifact.
-*   `ffmpeg`: Optional third-party tool used by `clip_extract`/`clip_mux` for container remuxing, e.g. raw H.264 to MP4 or AAC to M4A.
+- `clip_store`：儲存 clip JSON record，key 可用 `session_id:ts`。
+- `clip_extract` / `clip_mux`：讀取 clip record，從 `.bin` 擷取 byte range，輸出 standalone artifact。
+- `ffmpeg`：可由 extractor/muxer 作為 third-party tool 使用，例如 raw H.264 -> MP4，AAC -> M4A。
 
-Example concept:
+概念流程：
 
 ```text
 stream_merge | log_parse --filter type=clip | clip_store
 clip_store --get sess:1747065600 -> clip_extract -> output.mp4
 ```
 
-This keeps `stream_merge` focused on stream aggregation and keeps codec/container details outside the core pipeline.
+這樣能讓 `stream_merge` 專注在 stream aggregation，不把 codec/container 細節塞進核心 pipeline。
 
-## Core FSM (Gap State Machine)
+## 核心 FSM
 
-The heart of `stream_merge` is `sm_fsm`, a mathematical state machine that enforces data continuity based solely on the `sequence` and `ts_ms` fields.
+`stream_merge` 的核心是 `sm_fsm`。它只根據 `sequence`、`offset`、`ts_ms` 與當前狀態判斷 clip 邊界。
 
-1.  **Collecting**: Accumulates `length` as long as `sequence == expected_seq`.
-2.  **RejectLateChunk (Deduplication)**: If `sequence < expected_seq`, the chunk is an out-of-order duplicate. The FSM ignores it.
-3.  **EmitComplete**: If the accumulated time (`ts_ms - start_ts_ms`) reaches the target window (e.g., 5 seconds), the FSM emits a `complete: true` clip and resets.
-4.  **EmitPartial (Gap Detection)**: If `sequence > expected_seq`, a network packet loss (gap) occurred. The FSM immediately emits the accumulated data as a `complete: false` partial clip and resets.
-5.  **Idle Timeout**: If no data arrives within the idle window (e.g., 2 seconds), the FSM flushes the current buffer as a partial clip.
+1. **Collecting**：當 `sequence == expected_seq` 且 `offset == expected_offset` 時，累積 `length`。
+2. **RejectLateChunk**：若 `sequence < expected_seq`，視為 late/duplicate chunk，直接忽略。
+3. **EmitComplete**：若 `ts_ms - start_ts_ms` 達到 `--clip-secs`，輸出 `complete: true` clip。
+4. **EmitPartial**：若 `sequence > expected_seq` 或 `offset` 不連續，輸出 `complete: false` partial clip，並從新 chunk 重新開始。
+5. **Idle Timeout**：若超過 `--idle-secs` 沒有新資料，將目前累積資料輸出為 partial clip。
 
-## Module Structure (v2.3)
+## 模組結構
 
-*   `stream_merge.c`: UNIX orchestration (CLI, `inotify`, `poll`, non-blocking I/O).
-*   `sm_fsm.c` / `sm_fsm.h`: The Core State Machine (No file I/O).
-*   `sm_reader.c` / `sm_reader.h`: JSONL parsing and normalized `meta_record` validation.
-*   `sm_events.c` / `sm_events.h`: String set for future event aggregation.
+```text
+applets/stream_merge/
+  stream_merge.c   CLI、inotify/poll、主 I/O 流程
+  sm_fsm.*         gap-aware clip FSM，不碰 file I/O
+  sm_reader.*      JSONL scalar 欄位解析與 meta_record validation
+  sm_events.*      未來 event tag aggregation 的小型 set helper
+```
 
-## Non-Goals For v2.3
+## v2.3 Non-Goals
 
-*   No RTP socket handling. RTP receive/reorder belongs to the upstream ingestor.
-*   No `.bin` to MP4/MP3 conversion. Media muxing belongs to a downstream extractor/muxer.
-*   No CRC32 validation. It can be added later if required, but it is not part of the current assignment scope.
+- 不處理 RTP socket；RTP receive/reorder 屬於上游 ingestor。
+- 不做 `.bin` -> MP4/MP3；media muxing 屬於 downstream extractor/muxer。
+- 不做 CRC32 validation；目前不是課程要求，可視需求後續補。
 
 ## Dependencies
 
-- Uses `libpipeline.h` for buffer and sentinel management.
-- Zero external dependencies (cJSON is embedded).
-- Does not modify existing applets (`log_parse`, `clip_store`).
+- 使用 `libpipeline.h` 的 dynamic buffer、inotify watch、sentinel helper。
+- 使用 repo 內 embedded cJSON，並透過 `jsonl_codec` scalar helpers 讀 metadata。
+- 不修改 `log_parse` 或 `clip_store` 的內部行為。
