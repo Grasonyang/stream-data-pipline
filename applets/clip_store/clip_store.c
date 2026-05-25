@@ -223,8 +223,8 @@ int main(int argc, char *argv[]) {
     } else if (mode == MODE_SET) {
         char *key = NULL;
         char *value = NULL;
-        if (parse_set_expr(set_arg, &key, &value) != 0 || key[0] == '\0') {
-            LOG_ERROR("invalid --set syntax; expected key=value");
+        if (parse_set_expr(set_arg, &key, &value) != 0 || key[0] == '\0' || value[0] == '\0') {
+            LOG_ERROR("invalid --set syntax; expected non-empty key and value");
             rc = 1;
         } else {
             long expire_at = ttl == 0 ? 0 : now + ttl;

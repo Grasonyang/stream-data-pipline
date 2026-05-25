@@ -171,9 +171,14 @@ static int row_index_put(row_index_t *index, const row_t *row) {
     int found = 0;
     size_t slot = find_slot(index, row->key, &found);
     if (!found) {
+        if (replace_row(&index->rows[slot], row) != 0) {
+            return -1;
+        }
         index->used[slot] = 1;
         index->len += 1;
+        return 0;
     }
+
     return replace_row(&index->rows[slot], row);
 }
 
