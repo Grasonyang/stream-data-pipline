@@ -32,6 +32,11 @@ CLIP_STORE_SRCS := \
     applets/clip_store/db_format.c \
     applets/clip_store/db_query.c \
     applets/clip_store/db_compact.c
+STREAM_MERGE_SRCS := \
+    applets/stream_merge/stream_merge.c \
+    applets/stream_merge/sm_fsm.c \
+    applets/stream_merge/sm_reader.c \
+    applets/stream_merge/sm_events.c
 
 APPLETS   := pipeline_dispatcher stream_merge log_parse clip_store
 BINS      := $(addprefix $(BUILD_DIR)/,$(APPLETS))
@@ -71,6 +76,9 @@ $(BUILD_DIR)/log_parse: $(LOG_PARSE_SRCS) applets/log_parse/log_parse.h applets/
 
 $(BUILD_DIR)/clip_store: $(CLIP_STORE_SRCS) applets/clip_store/clip_store.h applets/clip_store/db_format.h applets/clip_store/db_query.h applets/clip_store/db_compact.h $(LIB_OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(CLIP_STORE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+
+$(BUILD_DIR)/stream_merge: $(STREAM_MERGE_SRCS) applets/stream_merge/sm_fsm.h applets/stream_merge/sm_reader.h applets/stream_merge/sm_events.h $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/stream_merge $(STREAM_MERGE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
 
 # Each applet links against the shared lib objects.
 $(BUILD_DIR)/%: applets/%.c $(LIB_OBJS) | $(BUILD_DIR)
