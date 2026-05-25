@@ -171,6 +171,45 @@ static void test_open_file_watch(void)
     rmdir(dir);
 }
 
+static void test_consume_inotify_events(void)
+{
+    char dir[128];
+    if (make_temp_dir(dir, sizeof(dir)) != 0) {
+        CHECK(0 && "make_temp_dir");
+        return;
+    }
+
+    int wd = -1;
+    int watch_fd = lp_watch_dir(dir, &wd);
+    CHECK(watch_fd >= 0);
+    CHECK(wd >= 0);
+    if (watch_fd < 0) {
+        rmdir(dir);
+        return;
+    }
+
+    char sentinel[160];
+    int n = snprintf(sentinel, sizeof(sentinel), "%s/%s", dir, PIPELINE_SENTINEL_NAME);
+    CHECK(n >= 0 && (size_t)n < sizeof(sentinel));
+
+    int fd = open(sentinel, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    CHECK(fd >= 0);
+    if (fd >= 0) {
+        CHECK(close(fd) == 0);
+    }
+
+    struct pollfd pfd = { .fd = watch_fd, .events = POLLIN };
+    CHECK(poll(&pfd, 1, 1000) == 1);
+
+    int saw_sentinel = 0;
+    CHECK(lp_consume_inotify_events(watch_fd, &saw_sentinel) == 0);
+    CHECK(saw_sentinel == 1);
+
+    close(watch_fd);
+    unlink(sentinel);
+    rmdir(dir);
+}
+
 static void test_buffer(void)
 {
     dynamic_buffer_t buf = {0};
@@ -269,6 +308,7 @@ int main(void)
     test_now_ms();
     test_open_dir_watch();
     test_open_file_watch();
+    test_consume_inotify_events();
     test_buffer();
     test_jsonl_parse();
     test_json_string_write();

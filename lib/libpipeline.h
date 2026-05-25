@@ -55,6 +55,19 @@ int lp_watch_dir(const char *dir_path, int *watch_descriptor);
 int lp_watch_file(const char *file_path, int *watch_descriptor);
 
 /**
+ * @brief Drain one non-blocking inotify fd and detect the pipeline sentinel.
+ *
+ * Reads and parses all currently queued inotify events from fd. If any event
+ * names `.pipeline_end`, `*saw_sentinel` is set to 1. The function tolerates
+ * EAGAIN/EWOULDBLOCK and returns once the fd is drained.
+ *
+ * @param fd Non-blocking inotify fd returned by lp_watch_dir() or lp_watch_file().
+ * @param saw_sentinel Output flag updated to 1 when the sentinel appears.
+ * @return 0 on success, -1 on invalid args or read failure with errno preserved.
+ */
+int lp_consume_inotify_events(int fd, int *saw_sentinel);
+
+/**
  * @brief Read the current monotonic time in milliseconds.
  *
  * Uses CLOCK_MONOTONIC so it is not affected by wall-clock changes.

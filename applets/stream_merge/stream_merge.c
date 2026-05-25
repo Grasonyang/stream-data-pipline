@@ -19,24 +19,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/inotify.h>
 #include <unistd.h>
 
 #define DEFAULT_CLIP_MS 5000
 #define DEFAULT_IDLE_MS 2000
 
 /** Emit one normalized clip JSON record to stdout. */
-static int emit_clip(const sm_clip_record_t *clip, const char *src,
-                     const char *session, int complete)
-{
+static int emit_clip(const sm_clip_record_t *clip, const char *src, const char *session, int complete) {
     if (clip == NULL || !clip->active) {
         return 0;
     }
 
     long ts_sec = (long)(clip->start_ts_ms / 1000);
+    char filename[PATH_MAX];
     char path[PATH_MAX];
-    int n = snprintf(path, sizeof(path), "%s/%s_%ld.bin", src, session, ts_sec);
-    if (n < 0 || (size_t)n >= sizeof(path)) {
+    int n = snprintf(filename, sizeof(filename), "%s_%ld.bin", session, ts_sec);
+    if (n < 0 || (size_t)n >= sizeof(filename) ||
+        lp_build_artifact_path(path, sizeof(path), src, filename) != 0) {
         LOG_ERROR("path too long for session %s", session);
         return -1;
     }
@@ -76,9 +75,7 @@ static int emit_clip(const sm_clip_record_t *clip, const char *src,
 }
 
 /** Convert an FSM action into the corresponding stdout emission. */
-static int handle_action(sm_fsm_action_t action, const sm_clip_record_t *clip,
-                         const char *src, const char *session)
-{
+static int handle_action(sm_fsm_action_t action, const sm_clip_record_t *clip, const char *src, const char *session) {
     if (action == SM_FSM_EMIT_COMPLETE) {
         return emit_clip(clip, src, session, 1);
     }
@@ -94,10 +91,7 @@ static int handle_action(sm_fsm_action_t action, const sm_clip_record_t *clip,
 /**
  * Drain newly appended metadata, split complete lines, and feed records to FSM.
  */
-static int drain_meta(int meta_fd, dynamic_buffer_t *meta_buf,
-                      sm_fsm_t *fsm, const char *src, const char *session,
-                      int64_t clip_ms)
-{
+static int drain_meta(int meta_fd, dynamic_buffer_t *meta_buf, sm_fsm_t *fsm, const char *src, const char *session, int64_t clip_ms) {
     char chunk[4096];
     for (;;) {
         ssize_t got = read(meta_fd, chunk, sizeof(chunk));
@@ -148,9 +142,7 @@ static int drain_meta(int meta_fd, dynamic_buffer_t *meta_buf,
 }
 
 /** Flush active state as a partial clip when no chunk arrives before timeout. */
-static int check_idle(sm_fsm_t *fsm, int64_t idle_ms,
-                      const char *src, const char *session)
-{
+static int check_idle(sm_fsm_t *fsm, int64_t idle_ms, const char *src, const char *session) {
     sm_clip_record_t clip = {0};
     int64_t now_ms = pipeline_get_monotonic_time_ms();
     sm_fsm_action_t action = sm_fsm_check_idle(fsm, idle_ms, now_ms, &clip);
@@ -161,8 +153,7 @@ static int check_idle(sm_fsm_t *fsm, int64_t idle_ms,
 }
 
 /** Check whether the session completion sentinel already exists. */
-static int sentinel_exists(const char *src)
-{
+static int sentinel_exists(const char *src) {
     char path[PATH_MAX];
     if (lp_build_artifact_path(path, sizeof(path), src, PIPELINE_SENTINEL_NAME) != 0) {
         return 0;
@@ -170,31 +161,8 @@ static int sentinel_exists(const char *src)
     return access(path, F_OK) == 0;
 }
 
-/** Drain inotify events and report whether the session sentinel appeared. */
-static void consume_inotify(int fd, int *saw_sentinel)
-{
-    char buf[4096];
-    for (;;) {
-        ssize_t got = read(fd, buf, sizeof(buf));
-        if (got <= 0) {
-            if (got < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-                LOG_WARN("inotify read: %s", strerror(errno));
-            }
-            return;
-        }
-        for (ssize_t off = 0; off + (ssize_t)sizeof(struct inotify_event) <= got;) {
-            const struct inotify_event *ev = (const struct inotify_event *)(buf + off);
-            if (ev->len > 0 && lp_is_completed_session(ev->name)) {
-                *saw_sentinel = 1;
-            }
-            off += (ssize_t)sizeof(struct inotify_event) + (ssize_t)ev->len;
-        }
-    }
-}
-
 /** Print CLI help text. */
-static void print_usage(FILE *stream, const char *prog_name)
-{
+static void print_usage(FILE *stream, const char *prog_name) {
     fprintf(stream, "Usage: %s [OPTIONS] <session_id> <src_dir>\n\n", prog_name);
     fprintf(stream, "Description:\n");
     fprintf(stream, "  Watches session sidecar metadata and emits clip JSON Lines.\n\n");
@@ -204,8 +172,7 @@ static void print_usage(FILE *stream, const char *prog_name)
     fprintf(stream, "  -h, --help             Show this help message and exit\n");
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     stream_logger_set_tag("stream_merge");
 
     int64_t clip_ms = DEFAULT_CLIP_MS;
@@ -271,11 +238,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    int saw_sentinel = sentinel_exists(src);
     int meta_fd = open(meta_path, O_RDONLY);
     if (meta_fd < 0 && errno == ENOENT) {
         LOG_INFO("meta file not yet present, waiting up to 5s");
         int64_t deadline = pipeline_get_monotonic_time_ms() + 5000;
-        while (meta_fd < 0) {
+        while (meta_fd < 0 && !saw_sentinel) {
             int64_t remaining = deadline - pipeline_get_monotonic_time_ms();
             if (remaining <= 0) {
                 LOG_ERROR("timed out waiting for %s", meta_path);
@@ -293,18 +261,30 @@ int main(int argc, char *argv[])
                 return 1;
             }
             if (prc > 0) {
-                char ibuf[4096];
-                ssize_t nr = read(dir_fd, ibuf, sizeof(ibuf));
-                (void)nr;
+                if (lp_consume_inotify_events(dir_fd, &saw_sentinel) != 0) {
+                    LOG_WARN("inotify read: %s", strerror(errno));
+                }
             }
-            meta_fd = open(meta_path, O_RDONLY);
+            if (!saw_sentinel) {
+                meta_fd = open(meta_path, O_RDONLY);
+            }
         }
-        LOG_INFO("meta file appeared");
+        if (meta_fd >= 0) {
+            LOG_INFO("meta file appeared");
+        } else if (saw_sentinel) {
+            LOG_INFO("session completed before meta file appeared");
+        }
     } else if (meta_fd < 0) {
         LOG_ERROR("open %s: %s", meta_path, strerror(errno));
         close(dir_fd);
         close(bin_fd);
         return 1;
+    }
+
+    if (meta_fd < 0) {
+        close(dir_fd);
+        close(bin_fd);
+        return 0;
     }
 
     int meta_wd = -1;
@@ -319,7 +299,6 @@ int main(int argc, char *argv[])
 
     dynamic_buffer_t meta_buf = {0};
     sm_fsm_t fsm = {0};
-    int saw_sentinel = sentinel_exists(src);
     int rc = 0;
 
     if (drain_meta(meta_fd, &meta_buf, &fsm, src, session, clip_ms) != 0) {
@@ -348,14 +327,18 @@ int main(int argc, char *argv[])
 
         if (pfds[0].revents & POLLIN) {
             int ignored = 0;
-            consume_inotify(meta_wfd, &ignored);
+            if (lp_consume_inotify_events(meta_wfd, &ignored) != 0) {
+                LOG_WARN("inotify read: %s", strerror(errno));
+            }
             if (drain_meta(meta_fd, &meta_buf, &fsm, src, session, clip_ms) != 0) {
                 rc = 1;
                 break;
             }
         }
         if (pfds[1].revents & POLLIN) {
-            consume_inotify(dir_fd, &saw_sentinel);
+            if (lp_consume_inotify_events(dir_fd, &saw_sentinel) != 0) {
+                LOG_WARN("inotify read: %s", strerror(errno));
+            }
         }
         if (sentinel_exists(src)) {
             saw_sentinel = 1;

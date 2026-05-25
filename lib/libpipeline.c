@@ -73,6 +73,32 @@ int lp_watch_file(const char *file_path, int *watch_descriptor) {
     return fd;
 }
 
+int lp_consume_inotify_events(int fd, int *saw_sentinel) {
+    if (fd < 0 || saw_sentinel == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    char buf[4096];
+    for (;;) {
+        ssize_t got = read(fd, buf, sizeof(buf));
+        if (got <= 0) {
+            if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                return 0;
+            }
+            return got == 0 ? 0 : -1;
+        }
+
+        for (ssize_t off = 0; off + (ssize_t)sizeof(struct inotify_event) <= got;) {
+            const struct inotify_event *ev = (const struct inotify_event *)(buf + off);
+            if (ev->len > 0 && lp_is_completed_session(ev->name)) {
+                *saw_sentinel = 1;
+            }
+            off += (ssize_t)sizeof(struct inotify_event) + (ssize_t)ev->len;
+        }
+    }
+}
+
 int64_t pipeline_get_monotonic_time_ms(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {

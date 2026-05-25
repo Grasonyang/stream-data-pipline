@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 /**
- * @brief Normalized metadata record consumed by the stream_merge FSM. (a video chunk)
+ * @brief One normalized metadata row representing a single chunk.
  */
 typedef struct {
     char kind[16];              /* Record kind; only "data" is processed. */
@@ -19,7 +19,7 @@ typedef struct {
 } sm_meta_record_t;
 
 /**
- * @brief Clip byte range produced by the FSM. (a video clip, combining one or more chunks)
+ * @brief One clip byte-range snapshot produced by the FSM.
  */
 typedef struct {
     int active;
@@ -31,7 +31,7 @@ typedef struct {
 } sm_clip_record_t;
 
 /**
- * @brief In-memory state for gap-aware clip aggregation. (a video clip, combining one or more chunks, differ with sm_clip_record_t in that it tracks expected sequence and offset for gap detection, and last chunk wall clock time for idle timeout)
+ * @brief In-memory working state for gap-aware clip aggregation.
  */
 typedef struct {
     int active;
@@ -76,13 +76,7 @@ void sm_fsm_reset(sm_fsm_t *fsm);
  * @param out Output clip snapshot when the return value is an emit action.
  * @return FSM action describing what the caller should do next.
  */
-sm_fsm_action_t sm_fsm_process_record(
-    sm_fsm_t *fsm,
-    const sm_meta_record_t *rec,
-    int64_t clip_ms,
-    int64_t now_ms,
-    sm_clip_record_t *out
-);
+sm_fsm_action_t sm_fsm_process_record(sm_fsm_t *fsm, const sm_meta_record_t *rec, int64_t clip_ms, int64_t now_ms, sm_clip_record_t *out);
 
 /**
  * @brief Flush the current clip when no chunks arrive before idle timeout.
@@ -93,12 +87,7 @@ sm_fsm_action_t sm_fsm_process_record(
  * @param out Output clip snapshot when a partial clip is emitted.
  * @return SM_FSM_EMIT_PARTIAL on timeout, otherwise SM_FSM_NONE.
  */
-sm_fsm_action_t sm_fsm_check_idle(
-    sm_fsm_t *fsm,
-    int64_t idle_ms,
-    int64_t now_ms,
-    sm_clip_record_t *out
-);
+sm_fsm_action_t sm_fsm_check_idle(sm_fsm_t *fsm, int64_t idle_ms, int64_t now_ms, sm_clip_record_t *out);
 
 /**
  * @brief Flush any active clip at end of stream.
@@ -107,9 +96,6 @@ sm_fsm_action_t sm_fsm_check_idle(
  * @param out Output clip snapshot when active data exists.
  * @return SM_FSM_EMIT_COMPLETE when a final clip is emitted, otherwise SM_FSM_NONE.
  */
-sm_fsm_action_t sm_fsm_flush_final(
-    sm_fsm_t *fsm,
-    sm_clip_record_t *out
-);
+sm_fsm_action_t sm_fsm_flush_final(sm_fsm_t *fsm, sm_clip_record_t *out);
 
 #endif

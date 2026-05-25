@@ -42,13 +42,7 @@ void sm_fsm_reset(sm_fsm_t *fsm) {
     }
 }
 
-sm_fsm_action_t sm_fsm_process_record(
-    sm_fsm_t *fsm,
-    const sm_meta_record_t *rec,
-    int64_t clip_ms,
-    int64_t now_ms,
-    sm_clip_record_t *out
-) {
+sm_fsm_action_t sm_fsm_process_record(sm_fsm_t *fsm, const sm_meta_record_t *rec, int64_t clip_ms, int64_t now_ms, sm_clip_record_t *out) {
     if (fsm == NULL || rec == NULL || out == NULL || !rec->valid) {
         return SM_FSM_NONE;
     }
