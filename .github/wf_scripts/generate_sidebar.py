@@ -49,8 +49,8 @@ def generate_sidebar_md(sidebar_config, indent=0):
         if page:
             # Convert page path to wiki page name
             wiki_page = normalize_page_name(page)
-            # Item with a page link - use GitHub Wiki format
-            md_lines.append(f"{prefix}[[{wiki_page}|{title}]]")
+            # GitHub Wiki links use [[display text|page name]].
+            md_lines.append(f"{prefix}[[{title}|{wiki_page}]]")
         else:
             # Category without a link
             md_lines.append(f"{prefix}**{title}**")

@@ -7,6 +7,9 @@ on:
       - feat-agents-skill-and-add-trigger-in-sync-wiki-action
     paths:
       - '.docs/**'
+      - '.github/wf_scripts/generate_sidebar.py'
+      - '.github/wf_scripts/sync-docs-to-wiki.sh'
+      - '.github/workflows/sync-docs-to-wiki.yml'
   workflow_dispatch:
 
 jobs:
