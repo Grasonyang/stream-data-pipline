@@ -9,6 +9,31 @@ import sys
 import yaml
 
 
+def normalize_page_name(page_path):
+    """Convert page path to GitHub Wiki page name
+    
+    Examples:
+    - Home -> Home
+    - core/overview -> Core-Overview
+    - applets/clip-store -> Applets-Clip-Store
+    """
+    if page_path == 'Home':
+        return 'Home'
+    
+    # Split by / first
+    parts = page_path.split('/')
+    
+    # Process each part: capitalize and handle dashes
+    result_parts = []
+    for part in parts:
+        # Split by dash and capitalize each word
+        subparts = part.split('-')
+        subparts = [sub.capitalize() for sub in subparts]
+        result_parts.append('-'.join(subparts))
+    
+    return '-'.join(result_parts)
+
+
 def generate_sidebar_md(sidebar_config, indent=0):
     """Recursively generate Markdown sidebar content"""
     md_lines = []
@@ -22,8 +47,10 @@ def generate_sidebar_md(sidebar_config, indent=0):
         prefix = '  ' * indent + '* '
         
         if page:
-            # Item with a page link
-            md_lines.append(f"{prefix}[{title}]({page})")
+            # Convert page path to wiki page name
+            wiki_page = normalize_page_name(page)
+            # Item with a page link - use GitHub Wiki format
+            md_lines.append(f"{prefix}[[{wiki_page}|{title}]]")
         else:
             # Category without a link
             md_lines.append(f"{prefix}**{title}**")
