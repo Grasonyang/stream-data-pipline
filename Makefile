@@ -47,7 +47,22 @@ PIPELINE_DISPATCHER_SRCS := \
 APPLETS   := pipeline_dispatcher stream_merge log_parse clip_store
 BINS      := $(addprefix $(BUILD_DIR)/,$(APPLETS))
 
-TEST_BINS    := $(BUILD_DIR)/test_libpipeline $(BUILD_DIR)/test_stream_logger $(BUILD_DIR)/test_lib_strict
+TEST_LIB_BINS := $(BUILD_DIR)/test_libpipeline $(BUILD_DIR)/test_dynamic_buffer $(BUILD_DIR)/test_jsonl_codec $(BUILD_DIR)/test_stream_logger
+TEST_APPLET_BINS := \
+    $(BUILD_DIR)/test_pd_config \
+    $(BUILD_DIR)/test_pd_pipeline \
+    $(BUILD_DIR)/test_pd_signal \
+    $(BUILD_DIR)/test_pd_spawn \
+    $(BUILD_DIR)/test_sm_fsm \
+    $(BUILD_DIR)/test_sm_events \
+    $(BUILD_DIR)/test_sm_reader \
+    $(BUILD_DIR)/test_log_regex \
+    $(BUILD_DIR)/test_log_filter_expr \
+    $(BUILD_DIR)/test_log_output_format \
+    $(BUILD_DIR)/test_db_format \
+    $(BUILD_DIR)/test_db_query \
+    $(BUILD_DIR)/test_db_compact
+TEST_BINS    := $(TEST_LIB_BINS) $(TEST_APPLET_BINS)
 TEST_SCRIPTS := tests/test_log_parse.sh tests/test_clip_store.sh tests/test_stream_merge.sh tests/test_pipeline_dispatcher.sh
 
 MAN_DIR   := man
@@ -93,14 +108,26 @@ $(BUILD_DIR)/pipeline_dispatcher: $(PIPELINE_DISPATCHER_SRCS) applets/pipeline_d
 $(BUILD_DIR)/%: applets/%.c $(LIB_OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
 
-$(BUILD_DIR)/test_libpipeline: tests/test_libpipeline.c $(LIB_OBJS) | $(BUILD_DIR)
+# --- Lib Unit Tests ---
+$(BUILD_DIR)/test_%: tests/lib/test_%.c $(LIB_OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
 
-$(BUILD_DIR)/test_stream_logger: tests/test_stream_logger.c $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+# --- Applet Unit Tests ---
+TEST_PD_SRCS := $(filter-out applets/pipeline_dispatcher/pipeline_dispatcher.c, $(PIPELINE_DISPATCHER_SRCS))
+$(BUILD_DIR)/test_pd_%: tests/applets/pipeline_dispatcher/test_pd_%.c $(TEST_PD_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/pipeline_dispatcher $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-$(BUILD_DIR)/test_lib_strict: tests/lib/test_lib_strict.c $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+TEST_SM_SRCS := $(filter-out applets/stream_merge/stream_merge.c, $(STREAM_MERGE_SRCS))
+$(BUILD_DIR)/test_sm_%: tests/applets/stream_merge/test_sm_%.c $(TEST_SM_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/stream_merge $^ $(LDFLAGS) $(LDLIBS) -o $@
+
+TEST_LOG_SRCS := $(filter-out applets/log_parse/log_parse.c, $(LOG_PARSE_SRCS))
+$(BUILD_DIR)/test_log_%: tests/applets/log_parse/test_log_%.c $(TEST_LOG_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/log_parse $^ $(LDFLAGS) $(LDLIBS) -o $@
+
+TEST_DB_SRCS := $(filter-out applets/clip_store/clip_store.c, $(CLIP_STORE_SRCS))
+$(BUILD_DIR)/test_db_%: tests/applets/clip_store/test_db_%.c $(TEST_DB_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/clip_store $^ $(LDFLAGS) $(LDLIBS) -o $@
 
 test: $(TEST_BINS) $(BINS)
 	@for test_bin in $(TEST_BINS); do $$test_bin || exit $$?; done

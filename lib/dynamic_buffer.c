@@ -89,6 +89,8 @@ int dynamic_buffer_reserve(dynamic_buffer_t *buf, size_t extra) {
 
     buf->data = data;
     buf->cap = next;
+    /* Enforce the NUL-terminator invariant immediately after allocation */
+    buf->data[buf->len] = '\0';
     return 0;
 }
 

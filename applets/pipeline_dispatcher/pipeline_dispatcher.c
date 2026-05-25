@@ -17,16 +17,22 @@ int main(int argc, char *argv[]) {
     stream_logger_set_tag("dispatcher");
 
     pd_config_t config;
+    
+    /* Parse command line arguments into configuration */
     int parse_rc = pd_config_parse(argc, argv, &config);
     if (parse_rc > 0) {
-        return PD_EXIT_OK;
+        return PD_EXIT_OK; /* --help printed */
     }
     if (parse_rc < 0) {
-        return PD_EXIT_BAD_ARGS;
+        return PD_EXIT_BAD_ARGS; /* Invalid usage */
     }
+    
+    /* Validate parsed configuration options */
     if (pd_config_validate(&config) != 0) {
         return PD_EXIT_SETUP_ERROR;
     }
+    
+    /* Setup safe signal handling for graceful shutdown */
     if (pd_signal_install() != 0) {
         LOG_ERROR("failed to install signal handlers");
         return PD_EXIT_SETUP_ERROR;
@@ -37,6 +43,8 @@ int main(int argc, char *argv[]) {
              config.clip_secs, config.idle_secs, config.filter);
 
     pd_pipeline_t pipeline;
+    
+    /* Run the full pipeline process hierarchy and block until completion */
     pd_exit_code_t rc = pd_pipeline_run(&config, &pipeline);
     if (rc == PD_EXIT_OK) {
         LOG_INFO("pipeline complete session=%s", config.session_id);

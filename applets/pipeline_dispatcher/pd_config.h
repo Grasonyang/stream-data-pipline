@@ -8,17 +8,17 @@
  * @brief Parsed dispatcher configuration and resolved applet paths.
  */
 typedef struct {
-    const char *program_name;
-    const char *session_id;
-    const char *src_dir;
-    const char *db_path;
-    const char *ttl;
-    const char *clip_secs;
-    const char *idle_secs;
-    const char *filter;
-    char bin_stream_merge[PATH_MAX];
-    char bin_log_parse[PATH_MAX];
-    char bin_clip_store[PATH_MAX];
+    const char *program_name;        /* Program name from argv[0] */
+    const char *session_id;          /* Target session to dispatch */
+    const char *src_dir;             /* Source directory containing log/stream files */
+    const char *db_path;             /* Target database for clip_store */
+    const char *ttl;                 /* TTL option for clip_store */
+    const char *clip_secs;           /* Clip window option for stream_merge */
+    const char *idle_secs;           /* Idle timeout option for stream_merge */
+    const char *filter;              /* Filter expression for log_parse */
+    char bin_stream_merge[PATH_MAX]; /* Resolved absolute path to stream_merge applet */
+    char bin_log_parse[PATH_MAX];    /* Resolved absolute path to log_parse applet */
+    char bin_clip_store[PATH_MAX];   /* Resolved absolute path to clip_store applet */
 } pd_config_t;
 
 /**

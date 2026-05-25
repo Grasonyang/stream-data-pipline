@@ -15,7 +15,19 @@
 #define DEFAULT_IDLE_SECS "2"
 #define DEFAULT_FILTER "type=clip"
 
-/** Resolve a sibling executable located next to the dispatcher binary. */
+/**
+ * @brief Resolve a sibling executable located next to the dispatcher binary.
+ * 
+ * Uses /proc/self/exe to find the true path of the dispatcher, then replaces
+ * the filename with the provided applet name. If /proc/self/exe fails,
+ * it falls back to argv[0].
+ * 
+ * @param out Buffer to store the resolved path.
+ * @param out_size Size of the output buffer.
+ * @param argv0 The program name from main's arguments.
+ * @param name The name of the sibling executable to resolve.
+ * @return 0 on success, -1 on buffer overflow or other error.
+ */
 static int sibling_path(char *out, size_t out_size, const char *argv0, const char *name) {
     char exe_path[PATH_MAX];
     ssize_t nread = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
@@ -41,7 +53,16 @@ static int sibling_path(char *out, size_t out_size, const char *argv0, const cha
     return 0;
 }
 
-/** Return 1 only when value is a base-10 integer and satisfies allow_zero. */
+/**
+ * @brief Return 1 only when value is a base-10 integer and satisfies allow_zero.
+ * 
+ * Uses strtoul to perform strict parsing of the numeric string. Validates
+ * that the entire string is consumed and optionally checks if 0 is permitted.
+ * 
+ * @param value The string to parse.
+ * @param allow_zero If non-zero, the integer 0 is considered valid.
+ * @return 1 if valid, 0 otherwise.
+ */
 static int valid_uint_string(const char *value, int allow_zero) {
     if (value == NULL || value[0] == '\0') {
         return 0;

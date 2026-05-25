@@ -1,7 +1,3 @@
-/*
- * test_stream_logger.c -- smoke tests for stderr-only logger behavior.
- */
-
 #include "libpipeline.h"
 
 #include <stdio.h>
@@ -83,9 +79,44 @@ static void test_logger_writes_stderr_only(void)
     fclose(captured_stderr);
 }
 
+static void test_stream_logger_strict(void)
+{
+    char tmpl[] = "/tmp/ws_logger_strict_XXXXXX";
+    int fd = mkstemp(tmpl);
+    CHECK(fd >= 0);
+    if (fd < 0) {
+        return;
+    }
+
+    int saved_stderr = dup(STDERR_FILENO);
+    CHECK(saved_stderr >= 0);
+    CHECK(dup2(fd, STDERR_FILENO) >= 0);
+
+    stream_logger_set_tag("strict_tag_name_that_is_longer_than_buffer");
+    stream_logger_log(LOG_LVL_WARN, "value=%d", 42);
+    fflush(stderr);
+
+    CHECK(dup2(saved_stderr, STDERR_FILENO) >= 0);
+    close(saved_stderr);
+
+    char buf[256] = {0};
+    CHECK(lseek(fd, 0, SEEK_SET) == 0);
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    CHECK(n > 0);
+    if (n > 0) {
+        buf[n] = '\0';
+        CHECK(strstr(buf, "Z [WARN] strict_tag_name_") != NULL);
+        CHECK(strstr(buf, ": value=42\n") != NULL);
+    }
+
+    close(fd);
+    unlink(tmpl);
+}
+
 int main(void)
 {
     test_logger_writes_stderr_only();
+    test_stream_logger_strict();
     if (failures == 0) {
         printf("OK: all stream_logger tests passed\n");
         return 0;

@@ -18,11 +18,13 @@ pid_t pd_spawn_child(const char *name, const char *bin, char *const argv[], int 
     }
     if (pid == 0) {
         if (stdin_fd != STDIN_FILENO && dup2(stdin_fd, STDIN_FILENO) < 0) {
-            _exit(126);
+            _exit(126); /* POSIX exit code for command cannot execute */
         }
         if (stdout_fd != STDOUT_FILENO && dup2(stdout_fd, STDOUT_FILENO) < 0) {
-            _exit(126);
+            _exit(126); /* POSIX exit code for command cannot execute */
         }
+        
+        /* Close unnecessary file descriptors to prevent leaks to child */
         for (size_t i = 0; i < close_count; ++i) {
             if (close_fds[i] >= 0) {
                 close(close_fds[i]);
@@ -45,6 +47,7 @@ pd_exit_code_t pd_wait_children(pd_child_t *children, size_t count) {
 
         int status = 0;
         if (waitpid(children[i].pid, &status, 0) < 0) {
+            /* Handle user interrupt cleanly by cascading termination to children */
             if (errno == EINTR && pd_signal_interrupted()) {
                 LOG_WARN("interrupted; terminating child processes");
                 pd_kill_children(children, count);

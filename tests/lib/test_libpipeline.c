@@ -1,7 +1,3 @@
-/*
- * test_libpipeline.c — smoke tests for the v1 libpipeline API.
- */
-
 #include "libpipeline.h"
 
 #include <errno.h>
@@ -210,96 +206,30 @@ static void test_consume_inotify_events(void)
     rmdir(dir);
 }
 
-static void test_buffer(void)
+static void test_libpipeline_helpers_strict(void)
 {
-    dynamic_buffer_t buf = {0};
+    char path[16];
+    char *dup = NULL;
 
-    CHECK(dynamic_buffer_append_char(&buf, 'a') == 0);
-    CHECK(dynamic_buffer_append_str(&buf, "bc") == 0);
-    CHECK(dynamic_buffer_append_mem(&buf, "def", 3) == 0);
-    CHECK(buf.len == 6);
-    CHECK(buf.cap >= buf.len + 1);
-    CHECK(strcmp(buf.data, "abcdef") == 0);
+    CHECK(lp_is_completed_session("/tmp/a/.pipeline_end") == 1);
+    CHECK(lp_is_completed_session("/tmp/a/.pipeline_end/") == 0);
+    CHECK(lp_is_completed_session(".pipeline_end.tmp") == 0);
 
-    CHECK(dynamic_buffer_reserve(&buf, 1024) == 0);
-    CHECK(buf.cap >= buf.len + 1024 + 1);
-    CHECK(strcmp(buf.data, "abcdef") == 0);
+    CHECK(lp_build_artifact_path(path, sizeof(path), "dir", "file") == 0);
+    CHECK(strcmp(path, "dir/file") == 0);
+    CHECK(lp_build_artifact_path(path, sizeof(path), "123456789", "abcdef") == -1);
+    CHECK(lp_build_artifact_path(NULL, sizeof(path), "dir", "file") == -1);
 
-    dynamic_buffer_free(&buf);
-    CHECK(buf.data == NULL);
-    CHECK(buf.len == 0);
-    CHECK(buf.cap == 0);
+    dup = lp_strndup("abcdef", 3);
+    CHECK(dup != NULL);
+    CHECK(strcmp(dup, "abc") == 0);
+    free(dup);
 
-    CHECK(dynamic_buffer_append_str(NULL, "x") == -1);
-    CHECK(dynamic_buffer_append_str(&buf, NULL) == -1);
-    CHECK(dynamic_buffer_append_mem(&buf, NULL, 1) == -1);
-
-    dynamic_buffer_t huge = {0};
-    huge.len = (size_t)-8;
-    huge.cap = huge.len;
-    CHECK(dynamic_buffer_reserve(&huge, 16) == -1);
-    CHECK(dynamic_buffer_has_failed(&huge) == 1);
-    CHECK(dynamic_buffer_append_char(&huge, 'x') == -1);
-    dynamic_buffer_reset(&huge);
-    CHECK(dynamic_buffer_has_failed(&huge) == 0);
-    CHECK(dynamic_buffer_append_str(&huge, "ok") == 0);
-    CHECK(strcmp(huge.data, "ok") == 0);
-    dynamic_buffer_free(&huge);
-
-    dynamic_buffer_t nul = {0};
-    CHECK(dynamic_buffer_append_mem(&nul, NULL, 0) == 0);
-    CHECK(nul.len == 0);
-    CHECK(nul.data != NULL);
-    CHECK(nul.data[0] == '\0');
-    dynamic_buffer_free(&nul);
-}
-
-static void test_jsonl_parse(void)
-{
-    const char *line = "{\"kind\":\"data\",\"sequence\":12,\"offset\":1024,\"length\":256,\"ts_ms\":1700,\"complete\":true}";
-    char kind[16] = {0};
-    uint64_t sequence = 0;
-    uint64_t offset = 0;
-    uint64_t length = 0;
-    int64_t ts_ms = 0;
-    int complete = 0;
-
-    CHECK(jsonl_get_string(line, "kind", kind, sizeof(kind)) == 0);
-    CHECK(jsonl_get_uint64(line, "sequence", &sequence) == 0);
-    CHECK(jsonl_get_uint64(line, "offset", &offset) == 0);
-    CHECK(jsonl_get_uint64(line, "length", &length) == 0);
-    CHECK(jsonl_get_int64(line, "ts_ms", &ts_ms) == 0);
-    CHECK(jsonl_get_bool(line, "complete", &complete) == 0);
-    CHECK(strcmp(kind, "data") == 0);
-    CHECK(sequence == 12);
-    CHECK(offset == 1024);
-    CHECK(length == 256);
-    CHECK(ts_ms == 1700);
-    CHECK(complete == 1);
-
-    char missing[8] = {0};
-    CHECK(jsonl_get_string(line, "missing", missing, sizeof(missing)) == -1);
-
-    const char *key_after_value = "{\"x\":\"kind\",\"kind\":\"data\"}";
-    memset(kind, 0, sizeof(kind));
-    CHECK(jsonl_get_string(key_after_value, "kind", kind, sizeof(kind)) == 0);
-    CHECK(strcmp(kind, "data") == 0);
-
-    const char *escaped = "{\"kind\":\"a\\nb\\tc\"}";
-    memset(kind, 0, sizeof(kind));
-    CHECK(jsonl_get_string(escaped, "kind", kind, sizeof(kind)) == 0);
-    CHECK(strcmp(kind, "a\nb\tc") == 0);
-
-    const char *negative_uint = "{\"sequence\":-1}";
-    CHECK(jsonl_get_uint64(negative_uint, "sequence", &sequence) == -1);
-}
-
-static void test_json_string_write(void)
-{
-    dynamic_buffer_t buf = {0};
-    CHECK(jsonl_write_string(&buf, "a\"b\\c\n") == 0);
-    CHECK(strcmp(buf.data, "\"a\\\"b\\\\c\\n\"") == 0);
-    dynamic_buffer_free(&buf);
+    dup = lp_strndup("abc", 0);
+    CHECK(dup != NULL);
+    CHECK(strcmp(dup, "") == 0);
+    free(dup);
+    CHECK(lp_strndup(NULL, 1) == NULL);
 }
 
 int main(void)
@@ -309,13 +239,12 @@ int main(void)
     test_open_dir_watch();
     test_open_file_watch();
     test_consume_inotify_events();
-    test_buffer();
-    test_jsonl_parse();
-    test_json_string_write();
+    test_libpipeline_helpers_strict();
+
     if (failures == 0) {
         printf("OK: all libpipeline tests passed\n");
         return 0;
     }
-    fprintf(stderr, "FAILED: %d check(s)\n", failures);
+    fprintf(stderr, "FAILED: %d libpipeline check(s)\n", failures);
     return 1;
 }

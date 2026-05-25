@@ -48,10 +48,14 @@ pd_exit_code_t pd_pipeline_run(const pd_config_t *cfg, pd_pipeline_t *pipeline) 
     }
 
     pd_pipeline_init(pipeline);
+    
+    /* Create first pipe: stream_merge -> log_parse */
     if (pipe(pipeline->pipe1) < 0) {
         LOG_ERROR("pipe1 failed: %s", strerror(errno));
         return PD_EXIT_SETUP_ERROR;
     }
+    
+    /* Create second pipe: log_parse -> clip_store */
     if (pipe(pipeline->pipe2) < 0) {
         LOG_ERROR("pipe2 failed: %s", strerror(errno));
         close_pipe_fds(pipeline);
@@ -79,6 +83,7 @@ pd_exit_code_t pd_pipeline_run(const pd_config_t *cfg, pd_pipeline_t *pipeline) 
     };
     int all_pipes[] = {pipeline->pipe1[0], pipeline->pipe1[1], pipeline->pipe2[0], pipeline->pipe2[1]};
 
+    /* Spawn stream_merge reading from original STDIN and writing to pipe1 */
     pipeline->children[0].path = cfg->bin_stream_merge;
     pipeline->children[0].pid = pd_spawn_child("stream_merge", cfg->bin_stream_merge, merge_argv, STDIN_FILENO, pipeline->pipe1[WRITE_END], all_pipes, 4);
     if (pipeline->children[0].pid < 0) {
@@ -86,6 +91,7 @@ pd_exit_code_t pd_pipeline_run(const pd_config_t *cfg, pd_pipeline_t *pipeline) 
         return PD_EXIT_SETUP_ERROR;
     }
 
+    /* Spawn log_parse reading from pipe1 and writing to pipe2 */
     pipeline->children[1].path = cfg->bin_log_parse;
     pipeline->children[1].pid = pd_spawn_child("log_parse", cfg->bin_log_parse, parse_argv, pipeline->pipe1[READ_END], pipeline->pipe2[WRITE_END], all_pipes, 4);
     if (pipeline->children[1].pid < 0) {
@@ -93,6 +99,7 @@ pd_exit_code_t pd_pipeline_run(const pd_config_t *cfg, pd_pipeline_t *pipeline) 
         return PD_EXIT_SETUP_ERROR;
     }
 
+    /* Spawn clip_store reading from pipe2 and writing to original STDOUT */
     pipeline->children[2].path = cfg->bin_clip_store;
     pipeline->children[2].pid = pd_spawn_child("clip_store", cfg->bin_clip_store, store_argv, pipeline->pipe2[READ_END], STDOUT_FILENO, all_pipes, 4);
     if (pipeline->children[2].pid < 0) {
