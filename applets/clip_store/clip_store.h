@@ -10,9 +10,9 @@
  * indicating when the record becomes invalid.
  */
 typedef struct {
-    char *key;        /**< Unique identifier for the record */
-    char *value;      /**< Data associated with the key, or empty string for tombstone */
-    long expire_at;   /**< Expiration timestamp in seconds, or 0 for no expiration */
+    char *key;        /**< Unique identifier for the record. */
+    char *value;      /**< Data associated with the key, or empty string for tombstone. */
+    long expire_at;   /**< Expiration timestamp in seconds, or 0 for no expiration. */
 } row_t;
 
 /**
@@ -20,7 +20,7 @@ typedef struct {
  * 
  * @param row Pointer to the row to check.
  * @param now Current UNIX timestamp.
- * @return 1 if the row is expired, 0 otherwise (including if row is NULL).
+ * @return 1 if the row is expired or invalid, 0 otherwise.
  */
 int clip_row_is_expired(const row_t *row, long now);
 

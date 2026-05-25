@@ -27,6 +27,12 @@ typedef enum {
     MODE_COMPACT
 } clip_mode_t;
 
+/**
+ * Print command-line usage for the clip_store applet.
+ *
+ * All diagnostics go to stderr through the caller, while --help sends this text
+ * to stdout so it can be piped or inspected without being treated as an error.
+ */
 static void print_usage(FILE *stream, const char *prog_name) {
     fprintf(stream, "Usage: %s --db <path> [OPTIONS]\n\n", prog_name);
     fprintf(stream, "Description:\n");
@@ -45,6 +51,13 @@ static void print_usage(FILE *stream, const char *prog_name) {
     fprintf(stream, "  -h, --help               Show this help message and exit\n");
 }
 
+/**
+ * Split a --set argument into key and value parts.
+ *
+ * The CLI accepts --set key=value. This helper modifies arg in place by
+ * replacing the first '=' with '\0', then returns pointers into the same argv
+ * buffer. The caller must not free key or value separately.
+ */
 static int parse_set_expr(char *arg, char **key, char **value) {
     if (arg == NULL || key == NULL || value == NULL) {
         return -1;
@@ -60,14 +73,24 @@ static int parse_set_expr(char *arg, char **key, char **value) {
     return 0;
 }
 
+/**
+ * Print latest live rows, optionally filtered by key prefix.
+ *
+ * The database is append-only, so this first rebuilds the latest-state hash
+ * index from the file. It then prints only rows that are not expired and not
+ * tombstones. Prefix mode reuses the same path and filters keys before output.
+ */
 static int print_rows(FILE *fp, const char *prefix, long now) {
-    row_list_t rows = {0};
+    row_index_t rows = {0};
     if (load_latest_rows(fp, &rows) != 0) {
-        row_list_free(&rows);
+        row_index_free(&rows);
         return -1;
     }
 
-    for (size_t i = 0; i < rows.len; ++i) {
+    for (size_t i = 0; i < rows.cap; ++i) {
+        if (!rows.used[i]) {
+            continue;
+        }
         /* Filter out expired rows or tombstones */
         if (!row_is_live(&rows.rows[i], now)) {
             continue;
@@ -79,7 +102,7 @@ static int print_rows(FILE *fp, const char *prefix, long now) {
         printf("%s\t%s\n", rows.rows[i].key, rows.rows[i].value);
     }
 
-    row_list_free(&rows);
+    row_index_free(&rows);
     return 0;
 }
 

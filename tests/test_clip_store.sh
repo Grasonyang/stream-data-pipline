@@ -54,4 +54,13 @@ wait
 "$CLIP_STORE" --db "$DB" --gc
 check_eq "concurrent writes line count" "7" "$(wc -l <"$DB" | tr -d ' ')"
 
+HASH_DB="$TMP_DIR/hash-grow.db"
+for i in $(seq 1 80); do
+    "$CLIP_STORE" --db "$HASH_DB" --ttl 0 --set "grow:$i=/tmp/grow_$i.mp4"
+done
+check_eq "hash index grows list count" "80" "$("$CLIP_STORE" --db "$HASH_DB" --list | wc -l | tr -d ' ')"
+check_eq "hash index grows get latest" "/tmp/grow_80.mp4" "$("$CLIP_STORE" --db "$HASH_DB" --get grow:80)"
+"$CLIP_STORE" --db "$HASH_DB" --compact
+check_eq "hash index grows compact count" "80" "$(wc -l <"$HASH_DB" | tr -d ' ')"
+
 printf 'OK: all clip_store tests passed\n'

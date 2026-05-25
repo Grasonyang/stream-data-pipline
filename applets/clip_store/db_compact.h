@@ -6,9 +6,10 @@
 /**
  * @brief Performs garbage collection on the database to reclaim space.
  * 
- * Reads all live, non-expired records, writes them to a temporary file,
- * and then atomically replaces the original database file. This removes
- * tombstones, expired records, and older overwritten versions of keys.
+ * Rebuilds an in-memory hash index from the append-only database, writes only
+ * latest live records to a temporary file, and then atomically replaces the
+ * original database file. This removes tombstones, expired records, and older
+ * overwritten versions of keys.
  * 
  * @param fp Open file pointer to the current database.
  * @param db_path Path to the current database file.

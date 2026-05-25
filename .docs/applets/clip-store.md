@@ -34,4 +34,5 @@ clip_store --db <path> --gc
 - `--delete` appends tombstone rows (empty value).
 - `--compact`/`--gc` rewrites through temp file + rename.
 - Compaction drops expired rows, tombstones, and overwritten old rows.
+- Query and compaction rebuild an in-memory hash index of latest key states.
 - Uses file locking for write paths.
