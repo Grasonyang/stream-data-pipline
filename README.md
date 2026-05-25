@@ -134,6 +134,35 @@ cat /tmp/clips.db
 
 完整 demo 會在 v2.2 的 benchmark/demo evidence 中補成可重跑腳本，涵蓋多筆 stream、malformed input、TTL/GC 與 failure behavior。
 
+### UDP Stream Demo Scripts
+
+為了把上游 ingestor 與 `pipeline_dispatcher` 的責任邊界具體化，`scripts/` 內提供兩個 shell script：
+
+- `scripts/udp_stream_data_server.sh`
+  - 模擬上游 UDP ingestor
+  - 接收 `STRT` / `DATASEQ` / `END` datagrams
+  - append `{session_id}.bin` 與 `{session_id}.meta.jsonl`
+  - 在 `STRT` 後立即啟動 `pipeline_dispatcher`
+- `scripts/udp_stream_data_client.sh`
+  - 傳送 normal demo 或 gap demo datagrams
+
+最小示例：
+
+```bash
+make
+scripts/udp_stream_data_server.sh --root-dir /tmp/udp_demo --db /tmp/udp_demo/clips.db &
+server_pid=$!
+scripts/udp_stream_data_client.sh --mode demo --session demo_udp
+scripts/udp_stream_data_client.sh --shutdown
+wait "$server_pid"
+cat /tmp/udp_demo/clips.db
+```
+
+這兩個 script 是 demo / contract 工具，不是正式 applet；它們的目的是說明：
+
+- 上游 socket ingestor 負責落地 `.bin` 與 `.meta.jsonl`
+- `pipeline_dispatcher` 負責啟動 `stream_merge -> log_parse -> clip_store`
+
 ## 目錄結構
 
 ```text
