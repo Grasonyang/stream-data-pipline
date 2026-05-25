@@ -1,5 +1,5 @@
 sidebar:
-  - title: ws_pipeline_dispatcher
+  - title: stream-data-pipeline
     items:
       - title: Home
         page: Home

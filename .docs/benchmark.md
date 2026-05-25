@@ -1,4 +1,4 @@
-# Benchmark Report — ws_pipeline_dispatcher
+# Benchmark Report — stream-data-pipeline
 
 ## 測試環境
 

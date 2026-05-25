@@ -1,6 +1,6 @@
 # 核心總覽
 
-`ws_pipeline_dispatcher` 是 C / UNIX pipeline repo。它不接 WebSocket，也不解析 ESP32 packet。
+`stream-data-pipeline` 是 C / UNIX pipeline repo。它不接 WebSocket，也不解析 ESP32 packet。
 
 ## 輸入 Layout
 
