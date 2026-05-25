@@ -29,6 +29,18 @@ printf '%s\n' '{"type":"clip","session_id":"sess_001","ts":1747065601,"path":"/t
     "$CLIP_STORE" --db "$DB" --ttl 0
 check_eq "ttl=0 never expires get" "/tmp/no_expire.mp4" "$("$CLIP_STORE" --db "$DB" --get sess_001:1747065601)"
 
+"$CLIP_STORE" --db "$DB" --set sess_002:1=/tmp/set.mp4
+check_eq "set get" "/tmp/set.mp4" "$("$CLIP_STORE" --db "$DB" --get sess_002:1)"
+
+check_eq "prefix list" "sess_001:1747065600	/tmp/two.mp4
+sess_001:1747065601	/tmp/no_expire.mp4" "$("$CLIP_STORE" --db "$DB" --prefix sess_001: | sort)"
+
+check_eq "list includes set" "sess_002:1	/tmp/set.mp4" "$("$CLIP_STORE" --db "$DB" --list | grep '^sess_002:1')"
+
+"$CLIP_STORE" --db "$DB" --delete sess_002:1
+check_eq "delete tombstone get empty" "" "$("$CLIP_STORE" --db "$DB" --get sess_002:1)"
+check_eq "delete hides from list" "" "$("$CLIP_STORE" --db "$DB" --list | grep '^sess_002:1' || true)"
+
 "$CLIP_STORE" --db "$DB" --gc
 check_eq "gc removes duplicates, keeps never-expire rows" "2" "$(wc -l <"$DB" | tr -d ' ')"
 check_eq "gc keeps latest for sess_001:1747065600" "sess_001:1747065600	/tmp/two.mp4" "$(grep '^sess_001:1747065600' "$DB" | cut -f1,2)"

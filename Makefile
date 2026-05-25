@@ -27,6 +27,11 @@ LOG_PARSE_SRCS := \
     applets/log_parse/log_filter_expr.c \
     applets/log_parse/log_output_format.c \
     applets/log_parse/log_regex.c
+CLIP_STORE_SRCS := \
+    applets/clip_store/clip_store.c \
+    applets/clip_store/db_format.c \
+    applets/clip_store/db_query.c \
+    applets/clip_store/db_compact.c
 
 APPLETS   := pipeline_dispatcher stream_merge log_parse clip_store
 BINS      := $(addprefix $(BUILD_DIR)/,$(APPLETS))
@@ -63,6 +68,9 @@ $(BUILD_DIR)/stream_logger.o: lib/stream_logger.c lib/stream_logger.h | $(BUILD_
 
 $(BUILD_DIR)/log_parse: $(LOG_PARSE_SRCS) applets/log_parse/log_parse.h applets/log_parse/log_filter_expr.h applets/log_parse/log_output_format.h applets/log_parse/log_regex.h $(LIB_OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LOG_PARSE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+
+$(BUILD_DIR)/clip_store: $(CLIP_STORE_SRCS) applets/clip_store/clip_store.h applets/clip_store/db_format.h applets/clip_store/db_query.h applets/clip_store/db_compact.h $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(CLIP_STORE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
 
 # Each applet links against the shared lib objects.
 $(BUILD_DIR)/%: applets/%.c $(LIB_OBJS) | $(BUILD_DIR)
