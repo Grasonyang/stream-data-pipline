@@ -13,6 +13,7 @@ typedef struct {
     char *key;        /**< Unique identifier for the record. */
     char *value;      /**< Data associated with the key, or empty string for tombstone. */
     long expire_at;   /**< Expiration timestamp in seconds, or 0 for no expiration. */
+    char *_alloc;     /**< Internal pointer to dynamically allocated value string, if any. */
 } row_t;
 
 /**

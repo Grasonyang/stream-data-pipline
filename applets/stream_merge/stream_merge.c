@@ -172,7 +172,7 @@ static void print_usage(FILE *stream, const char *prog_name) {
     fprintf(stream, "  -h, --help             Show this help message and exit\n");
 }
 
-int main(int argc, char *argv[]) {
+int stream_merge_main(int argc, char *argv[]) {
     stream_logger_set_tag("stream_merge");
 
     int64_t clip_ms = DEFAULT_CLIP_MS;

@@ -207,9 +207,11 @@ int load_latest_rows(FILE *fp, row_index_t *out) {
             continue;
         }
         if (row_index_put(out, &parsed) != 0) {
+            free_db_row(&parsed);
             free(line);
             return -1;
         }
+        free_db_row(&parsed);
     }
 
     free(line);

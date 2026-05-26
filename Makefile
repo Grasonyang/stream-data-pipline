@@ -15,13 +15,13 @@
 
 CC        ?= cc
 CFLAGS    ?= -std=c11 -O2 -g -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L
-CPPFLAGS  ?= -Ilib -I.third-party/cJSON
+CPPFLAGS  ?= -Ilib -I.third-party/cJSON -I.third-party/miniz
 LDFLAGS   ?=
 LDLIBS    ?=
 
 BUILD_DIR := .build
-LIB_SRCS  := lib/libpipeline.c lib/dynamic_buffer.c lib/jsonl_codec.c lib/stream_logger.c .third-party/cJSON/cJSON.c
-LIB_OBJS  := $(BUILD_DIR)/libpipeline.o $(BUILD_DIR)/dynamic_buffer.o $(BUILD_DIR)/jsonl_codec.o $(BUILD_DIR)/stream_logger.o $(BUILD_DIR)/cJSON.o
+LIB_SRCS  := lib/libpipeline.c lib/dynamic_buffer.c lib/jsonl_codec.c lib/stream_logger.c lib/base64.c .third-party/cJSON/cJSON.c .third-party/miniz/miniz.c
+LIB_OBJS  := $(BUILD_DIR)/libpipeline.o $(BUILD_DIR)/dynamic_buffer.o $(BUILD_DIR)/jsonl_codec.o $(BUILD_DIR)/stream_logger.o $(BUILD_DIR)/base64.o $(BUILD_DIR)/cJSON.o $(BUILD_DIR)/miniz.o
 LOG_PARSE_SRCS := \
     applets/log_parse/log_parse.c \
     applets/log_parse/log_filter_expr.c \
@@ -44,8 +44,11 @@ PIPELINE_DISPATCHER_SRCS := \
     applets/pipeline_dispatcher/pd_spawn.c \
     applets/pipeline_dispatcher/pd_signal.c
 
+ALL_APPLET_SRCS := applets/main.c $(LOG_PARSE_SRCS) $(CLIP_STORE_SRCS) $(STREAM_MERGE_SRCS) $(PIPELINE_DISPATCHER_SRCS)
+
 APPLETS   := pipeline_dispatcher stream_merge log_parse clip_store
-BINS      := $(addprefix $(BUILD_DIR)/,$(APPLETS))
+BOX_BIN   := $(BUILD_DIR)/box
+BINS      := $(BOX_BIN) $(addprefix $(BUILD_DIR)/,$(APPLETS))
 
 TEST_LIB_BINS := $(BUILD_DIR)/test_libpipeline $(BUILD_DIR)/test_dynamic_buffer $(BUILD_DIR)/test_jsonl_codec $(BUILD_DIR)/test_stream_logger
 TEST_APPLET_BINS := \
@@ -76,37 +79,20 @@ all: $(BINS)
 $(BUILD_DIR):
 	@mkdir -p $@
 
-$(BUILD_DIR)/libpipeline.o: lib/libpipeline.c lib/libpipeline.h lib/dynamic_buffer.h lib/jsonl_codec.h lib/stream_logger.h | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: lib/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/dynamic_buffer.o: lib/dynamic_buffer.c lib/dynamic_buffer.h | $(BUILD_DIR)
+$(BUILD_DIR)/cJSON.o: .third-party/cJSON/cJSON.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/jsonl_codec.o: lib/jsonl_codec.c lib/jsonl_codec.h lib/dynamic_buffer.h .third-party/cJSON/cJSON.h | $(BUILD_DIR)
+$(BUILD_DIR)/miniz.o: .third-party/miniz/miniz.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/cJSON.o: .third-party/cJSON/cJSON.c .third-party/cJSON/cJSON.h | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+$(BOX_BIN): $(ALL_APPLET_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/pipeline_dispatcher -Iapplets/stream_merge -Iapplets/log_parse -Iapplets/clip_store -I.third-party/miniz $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-$(BUILD_DIR)/stream_logger.o: lib/stream_logger.c lib/stream_logger.h | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
-
-
-$(BUILD_DIR)/log_parse: $(LOG_PARSE_SRCS) applets/log_parse/log_parse.h applets/log_parse/log_filter_expr.h applets/log_parse/log_output_format.h applets/log_parse/log_regex.h $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LOG_PARSE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
-
-$(BUILD_DIR)/clip_store: $(CLIP_STORE_SRCS) applets/clip_store/clip_store.h applets/clip_store/db_format.h applets/clip_store/db_query.h applets/clip_store/db_compact.h $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(CLIP_STORE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
-
-$(BUILD_DIR)/stream_merge: $(STREAM_MERGE_SRCS) applets/stream_merge/sm_fsm.h applets/stream_merge/sm_reader.h applets/stream_merge/sm_events.h $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/stream_merge $(STREAM_MERGE_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
-
-$(BUILD_DIR)/pipeline_dispatcher: $(PIPELINE_DISPATCHER_SRCS) applets/pipeline_dispatcher/pd_config.h applets/pipeline_dispatcher/pd_exit.h applets/pipeline_dispatcher/pd_pipeline.h applets/pipeline_dispatcher/pd_signal.h applets/pipeline_dispatcher/pd_spawn.h $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/pipeline_dispatcher $(PIPELINE_DISPATCHER_SRCS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
-
-# Each applet links against the shared lib objects.
-$(BUILD_DIR)/%: applets/%.c $(LIB_OBJS) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS) -o $@
+$(BUILD_DIR)/%: $(BOX_BIN)
+	ln -sf box $@
 
 # --- Lib Unit Tests ---
 $(BUILD_DIR)/test_%: tests/lib/test_%.c $(LIB_OBJS) | $(BUILD_DIR)
@@ -151,3 +137,4 @@ install-man: $(MAN_PAGES)
 
 clean:
 	rm -rf $(BUILD_DIR)
+

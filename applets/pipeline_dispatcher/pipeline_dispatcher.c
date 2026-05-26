@@ -13,7 +13,7 @@
 
 #include <string.h>
 
-int main(int argc, char *argv[]) {
+int pipeline_dispatcher_main(int argc, char *argv[]) {
     stream_logger_set_tag("dispatcher");
 
     pd_config_t config;

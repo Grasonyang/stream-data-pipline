@@ -106,7 +106,7 @@ static int print_rows(FILE *fp, const char *prefix, long now) {
     return 0;
 }
 
-int main(int argc, char *argv[]) {
+int clip_store_main(int argc, char *argv[]) {
     stream_logger_set_tag("clip_store");
 
     const char *db = NULL;
