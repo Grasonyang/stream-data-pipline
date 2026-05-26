@@ -8,13 +8,21 @@
  * 
  * The expected format is: key<TAB>value<TAB>expire_at
  * Modifies the input line in place by replacing tabs with NUL characters.
+ * Automatically decompresses Zlib+Base64 encoded values.
  * 
  * @param line The raw NUL-terminated string read from the database file.
  * @param row Output structure to hold the parsed fields.
- * @return 0 on success, -1 if the format is invalid.
- * @note The key and value pointers in row will point directly into the modified line buffer.
+ * @return 0 on success, -1 if the format is invalid or decompression fails.
+ * @note Call free_db_row() to release any decompressed memory.
  */
 int parse_db_row(char *line, row_t *row);
+
+/**
+ * @brief Frees any memory allocated internally by parse_db_row.
+ * 
+ * @param row Pointer to the parsed row structure.
+ */
+void free_db_row(row_t *row);
 
 /**
  * @brief Appends a new key-value row to the database file.
