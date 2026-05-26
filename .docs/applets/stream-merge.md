@@ -76,8 +76,7 @@ touch .pipeline_end
 概念流程：
 
 ```text
-stream_merge | log_parse --filter type=clip | clip_store
-clip_store --get sess:1747065600 -> clip_extract -> output.mp4
+box stream_merge | box log_parse --filter type=clip | box clip_store
 ```
 
 這樣能讓 `stream_merge` 專注在 stream aggregation，不把 codec/container 細節塞進核心 pipeline。

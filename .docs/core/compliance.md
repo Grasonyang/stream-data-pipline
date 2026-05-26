@@ -3,7 +3,7 @@
 | 要求 | 狀態 | 證據 |
 | --- | --- | --- |
 | C applets | 已完成 | `stream_merge`、`log_parse`、`clip_store` 由 `make` 建置 |
-| UNIX pipeline | 已完成 | `pipeline_dispatcher` 建立 `stream_merge -> log_parse -> clip_store` |
+| UNIX pipeline | 已完成 | `pipeline_dispatcher` 透過 `box` 單一執行檔建立 `stream_merge -> log_parse -> clip_store` |
 | Process management | 已完成 | `pipe()`、`fork()`、`execv()`、`waitpid()`、signal cleanup |
 | stdout/stderr discipline | 已完成 | applet tests + `stream_logger` |
 | Structured parser | 已完成 | `log_parse --regex --fields --format json/csv` |

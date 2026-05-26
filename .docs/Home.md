@@ -10,7 +10,7 @@
 
 ## 模組文件
 
-- `applets/pipeline-dispatcher.md`：建立 `stream_merge | log_parse | clip_store`。
+- `applets/pipeline-dispatcher.md`：建立 `box stream_merge | box log_parse | box clip_store`。
 - `applets/stream-merge.md`：讀 `.meta.jsonl`，輸出 clip byte-range metadata。
 - `applets/log-parse.md`：regex parse 與 JSONL filter。
 - `applets/clip-store.md`：file-backed clip index、TTL、GC。

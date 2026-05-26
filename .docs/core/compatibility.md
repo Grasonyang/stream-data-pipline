@@ -53,9 +53,7 @@ JSON 中的數字值（無引號）無法透過此語法匹配，
 ### 使用等效指令
 
 ```bash
-# log_parse --filter type=clip
-grep '"type":"clip"'          # GNU / Toybox grep（行為接近但不等同）
-jq 'select(.type == "clip")'  # 語意完全等同（需安裝 jq）
+box stream_merge | box log_parse --filter type=clip | box clip_store
 ```
 
 ---
