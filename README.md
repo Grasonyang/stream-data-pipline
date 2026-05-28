@@ -225,11 +225,6 @@ cat /tmp/udp_demo/clips.db
 - `clip_store` 可寫入 file-backed index，並支援查詢、TTL、GC。
 - `libpipeline` 與 `stream_logger` 提供 applet 共用低階 helper。
 
-v2 會優先補齊作業交付需要的文件、收斂與證據：
-
-- v2.0：文件主軸對齊，補 README、compliance matrix、repo docs 與開源文件骨架。
-- v2.1：Pipeline 核心收斂，修正 contract mismatch 並抽出必要共用邏輯。
-- v2.2：Benchmark 與 Demo 證據，補可重跑 benchmark、compatibility matrix 與 final demo script。
 
 ## 文件
 

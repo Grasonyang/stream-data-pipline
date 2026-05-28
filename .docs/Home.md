@@ -15,6 +15,15 @@
 - `applets/log-parse.md`：regex parse 與 JSONL filter。
 - `applets/clip-store.md`：file-backed clip index、TTL、GC。
 
+## Repo 目錄
+
+- `applets/`：正式 applet 與 `main.c` dispatcher entrypoint。
+- `lib/`：共享 helper 與 codec 模組。
+- `tests/`：lib/applet 單元測試與 shell 整合測試。
+- `scripts/`：benchmark、UDP demo、applet examples。
+- `man/`：四個 applet 的 man pages。
+- `.third-party/`：vendored `cJSON`、`miniz`。
+
 ## 文件規則
 
 - 不在 repo docs 重複 Linear 的 cross-repo 規格。

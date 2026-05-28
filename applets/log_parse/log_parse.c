@@ -268,15 +268,6 @@ int log_parse_main(int argc, char *argv[]) {
         } else {
             int matched = 0;
             
-            /* Fast-path optimization: if looking for an exact match or substring, 
-               and the value string isn't anywhere in the line, skip full JSON parsing. */
-            if ((filter.op == FILTER_EQUALS || filter.op == FILTER_CONTAINS) && 
-                filter.value != NULL && filter.value[0] != '\0') {
-                if (strstr(line, filter.value) == NULL) {
-                    continue;
-                }
-            }
-            
             if (log_filter_match_jsonl(line, &filter, &matched) != 0) {
                 LOG_WARN("malformed JSON line; skipping");
                 continue;
