@@ -447,21 +447,3 @@ echo "Results CSV:  $CSV"
 echo "Logs:         $LOG_DIR"
 echo
 column -t -s, "$CSV" | head -80
-local jqs_tp=$(mb_per_s "$size_mb" "$WALL")
-        echo "    jq --stream         PASS  ${jqs_tp} MB/s  rss=${jqs_rss}kB"
-        csv_row 7 constrained jq_stream "$size_mb" "$WALL" "$jqs_tp" 0 "$jqs_rss" "stress-pass"
-    else
-        echo "    jq --stream         FAIL exit=$?"
-        csv_row 7 constrained jq_stream "$size_mb" "$WALL" 0 0 0 "stress-FAILED"
-    fi
-}
-if want_phase 7; then banner "Phase 7: Stress test — memory ceiling behaviour"; for_each_mode phase7_body; fi
-
-banner "Done"
-echo "Results CSV:  $CSV"
-echo "Logs:         $LOG_DIR"
-echo
-column -t -s, "$CSV" | head -80
-_DIR"
-echo
-column -t -s, "$CSV" | head -80
