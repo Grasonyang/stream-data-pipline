@@ -1,7 +1,21 @@
+# Build artifacts
 build/
 .build/
 *.o
 *.a
 *.so
 *.dSYM/
+
+# Test scratch
 test_env/
+
+# Benchmark transient outputs (the per-run CSV + logs are noisy; keep only
+# snapshots under scripts/benchmark/results/runs/ which ARE tracked)
+scripts/benchmark/results/results.csv
+scripts/benchmark/results/logs/
+
+# Editor & OS
+*.swp
+*~
+.DS_Store
+Thumbs.db

@@ -113,7 +113,7 @@ int log_filter_match_jsonl(const char *line, const filter_t *filter, int *matche
         case FILTER_CONTAINS: {
             char value[1024] = {0};
             if (jsonl_get_scalar_text(line, filter->key, value, sizeof(value)) != 0) {
-                return 0;
+                return -1;
             }
             
             if (filter->op == FILTER_EQUALS) {

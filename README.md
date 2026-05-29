@@ -172,35 +172,46 @@ cat /tmp/udp_demo/clips.db
 ```text
 .
 |-- applets/
-|   |-- main.c                  # BusyBox-style dispatcher entrypoint
-|   |-- pipeline_dispatcher/    # fork + pipe + exec orchestration
-|   |-- stream_merge/           # sidecar-driven clip metadata emitter
-|   |-- log_parse/              # regex parser, JSON/CSV formatter, record filter
-|   `-- clip_store/             # file-backed clip index
+|   |-- main.c                      # BusyBox 單一執行檔入口，透過 argv[0] 或 argv[1] 分派 applet
+|   |-- pipeline_dispatcher/        # fork + pipe + exec orchestration
+|   |-- stream_merge/               # sidecar-driven clip metadata emitter
+|   |-- log_parse/                  # regex parser, JSON/CSV formatter, record filter
+|   `-- clip_store/                 # file-backed clip index with zlib compression
 |-- lib/
-|   |-- libpipeline.{h,c}       # inotify, monotonic time, sentinel helpers
-|   |-- stream_logger.{h,c}     # stderr-only diagnostic logger
-|   |-- dynamic_buffer.{h,c}    # resizable buffer utilities
-|   |-- jsonl_codec.{h,c}       # JSON Lines encode/decode helpers
-|   `-- base64.{h,c}            # Base64 codec used by clip_store
+|   |-- libpipeline.{h,c}           # inotify, monotonic time, buffer, sentinel helpers
+|   |-- stream_logger.{h,c}         # stderr-only diagnostic logger
+|   |-- dynamic_buffer.{h,c}        # growable byte buffer
+|   |-- jsonl_codec.{h,c}           # JSON Lines encode/decode helpers
+|   |-- base64.{h,c}                # Base64 encode/decode (used by clip_store compression)
 |-- man/
-|   |-- pipeline_dispatcher.1   # man page: pipeline_dispatcher
-|   |-- stream_merge.1          # man page: stream_merge
-|   |-- log_parse.1             # man page: log_parse
-|   `-- clip_store.1            # man page: clip_store
-|-- tests/
-|   |-- lib/                    # shared-library unit tests
-|   |-- applets/                # per-applet unit tests
-|   `-- test_*.sh               # shell integration tests
+|   |-- stream_merge.1              # man page: stream_merge
+|   |-- log_parse.1                 # man page: log_parse
+|   |-- clip_store.1                # man page: clip_store
+|   `-- pipeline_dispatcher.1       # man page: pipeline_dispatcher
 |-- scripts/
-|   |-- applets_pipeline_examples/ # runnable example scripts per applet
-|   |-- benchmark/              # benchmark entrypoints
-|   |-- udp_stream_data_*.sh    # upstream ingestor demo scripts
-|   `-- gen_data.py             # synthetic data generator
-|-- .docs/
-|   |-- core/                   # overview, compliance, compatibility
-|   `-- applets/                # per-applet behavior docs
-|-- .third-party/               # vendored cJSON and miniz
+|   |-- applets_pipline_example/    # 四個 applet 的最小可跑範例腳本
+|   |-- benchmark/
+|   |   `-- run_all.sh              # 與 jq, awk 的吞吐量效能對比基準測試
+|   |-- udp_stream_data_server.sh   # 模擬上游 UDP ingestor（demo 用）
+|   |-- udp_stream_data_client.sh   # 傳送 demo datagrams（demo 用）
+|   `-- gen_data.py                 # 測試資料產生器
+|-- tests/
+|   |-- lib/                        # lib 層 C unit tests
+|   |-- applets/                    # 各 applet C unit tests
+|   |   |-- clip_store/
+|   |   |-- log_parse/
+|   |   |-- pipeline_dispatcher/
+|   |   `-- stream_merge/
+|   |-- test_clip_store.sh          # clip_store shell integration test
+|   |-- test_log_parse.sh           # log_parse shell integration test
+|   |-- test_pipeline_dispatcher.sh # pipeline_dispatcher shell integration test
+|   `-- test_stream_merge.sh        # stream_merge shell integration test
+|-- .third-party/
+|   |-- cJSON/                      # JSON 解析函式庫（git submodule）
+|   `-- miniz/                      # zlib-compatible 壓縮函式庫
+|-- .docs/                          # repo-local implementation and design docs
+|   |-- core/                       # project overview and compliance summary
+|   `-- applets/                    # per-applet behavior docs
 `-- Makefile
 ```
 
