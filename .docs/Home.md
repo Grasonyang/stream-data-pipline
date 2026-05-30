@@ -22,7 +22,7 @@
 - `tests/`：lib/applet 單元測試與 shell 整合測試。
 - `scripts/`：benchmark、UDP demo、applet examples。
 - `man/`：四個 applet 的 man pages。
-- `.third-party/`：vendored `cJSON`、`miniz`。
+- `.third-party/`：以 git submodule 引入的 `cJSON`、`miniz`。
 
 ## 文件規則
 

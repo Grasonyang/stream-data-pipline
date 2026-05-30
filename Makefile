@@ -20,8 +20,8 @@ LDFLAGS   ?=
 LDLIBS    ?=
 
 BUILD_DIR := .build
-LIB_SRCS  := lib/libpipeline.c lib/dynamic_buffer.c lib/jsonl_codec.c lib/stream_logger.c lib/base64.c .third-party/cJSON/cJSON.c .third-party/miniz/miniz.c
-LIB_OBJS  := $(BUILD_DIR)/libpipeline.o $(BUILD_DIR)/dynamic_buffer.o $(BUILD_DIR)/jsonl_codec.o $(BUILD_DIR)/stream_logger.o $(BUILD_DIR)/base64.o $(BUILD_DIR)/cJSON.o $(BUILD_DIR)/miniz.o
+LIB_SRCS  := lib/libpipeline.c lib/dynamic_buffer.c lib/jsonl_codec.c lib/stream_logger.c lib/base64.c .third-party/cJSON/cJSON.c .third-party/miniz/miniz.c .third-party/miniz/miniz_tdef.c .third-party/miniz/miniz_tinfl.c .third-party/miniz/miniz_zip.c
+LIB_OBJS  := $(BUILD_DIR)/libpipeline.o $(BUILD_DIR)/dynamic_buffer.o $(BUILD_DIR)/jsonl_codec.o $(BUILD_DIR)/stream_logger.o $(BUILD_DIR)/base64.o $(BUILD_DIR)/cJSON.o $(BUILD_DIR)/miniz.o $(BUILD_DIR)/miniz_tdef.o $(BUILD_DIR)/miniz_tinfl.o $(BUILD_DIR)/miniz_zip.o
 LOG_PARSE_SRCS := \
     applets/log_parse/log_parse.c \
     applets/log_parse/log_filter_expr.c \
@@ -88,6 +88,15 @@ $(BUILD_DIR)/cJSON.o: .third-party/cJSON/cJSON.c | $(BUILD_DIR)
 $(BUILD_DIR)/miniz.o: .third-party/miniz/miniz.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/miniz_tdef.o: .third-party/miniz/miniz_tdef.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/miniz_tinfl.o: .third-party/miniz/miniz_tinfl.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/miniz_zip.o: .third-party/miniz/miniz_zip.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 $(BOX_BIN): $(ALL_APPLET_SRCS) $(LIB_OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -Iapplets/pipeline_dispatcher -Iapplets/stream_merge -Iapplets/log_parse -Iapplets/clip_store -I.third-party/miniz $^ $(LDFLAGS) $(LDLIBS) -o $@
 
@@ -137,4 +146,3 @@ install-man: $(MAN_PAGES)
 
 clean:
 	rm -rf $(BUILD_DIR)
-

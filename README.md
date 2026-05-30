@@ -208,7 +208,7 @@ cat /tmp/udp_demo/clips.db
 |   `-- test_stream_merge.sh        # stream_merge shell integration test
 |-- .third-party/
 |   |-- cJSON/                      # JSON 解析函式庫（git submodule）
-|   `-- miniz/                      # zlib-compatible 壓縮函式庫
+|   `-- miniz/                      # zlib-compatible 壓縮函式庫（git submodule）
 |-- .docs/                          # repo-local implementation and design docs
 |   |-- core/                       # project overview and compliance summary
 |   `-- applets/                    # per-applet behavior docs
